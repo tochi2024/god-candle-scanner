@@ -1,254 +1,52 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Whale Intel Pro | Macro Scanner</title>
-    <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
-    <style>
-        /* 1. THEME VARIABLES */
-        :root {
-            --bg-main: #ffffff;
-            --bg-sidebar: #f8f9fa;
-            --bg-card: #ffffff;
-            --bg-input: #ffffff;
-            --text-main: #1a1d21;
-            --text-muted: #64748b;
-            --border: #e2e8f0;
-            --accent: #10b981; /* Emerlad Green */
-            --danger: #ef4444; /* Soft Red */
-            --warning: #f59e0b; /* Amber */
-            --shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1);
-        }
+<!-- Inside the style tag, add this specific style for the explanation text -->
+<style>
+    /* ... existing styles ... */
+    .conclusion {
+        font-size: 12px;
+        line-height: 1.5;
+        background: rgba(0,0,0,0.05);
+        padding: 10px;
+        border-radius: 6px;
+        margin-top: 12px;
+        border-left: 3px solid var(--border);
+        color: var(--text-main);
+        font-style: italic;
+    }
+    @media (prefers-color-scheme: dark) {
+        .conclusion { background: rgba(255,255,255,0.05); }
+    }
+</style>
 
-        @media (prefers-color-scheme: dark) {
-            :root {
-                --bg-main: #000000;
-                --bg-sidebar: #0f1115;
-                --bg-card: #161a1e;
-                --bg-input: #000000;
-                --text-main: #f1f5f9;
-                --text-muted: #94a3b8;
-                --border: #262c35;
-                --accent: #34d399;
-                --danger: #fb7185;
-                --warning: #fbbf24;
-                --shadow: 0 4px 6px -1px rgb(0 0 0 / 0.3);
-            }
-        }
-
-        /* 2. BASE STYLES */
-        body {
-            background: var(--bg-main);
-            color: var(--text-main);
-            font-family: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            margin: 0;
-            display: flex;
-            height: 100vh;
-            overflow: hidden;
-            -webkit-font-smoothing: antialiased;
-        }
-
-        #sidebar {
-            width: 380px;
-            border-right: 1px solid var(--border);
-            padding: 20px;
-            display: flex;
-            flex-direction: column;
-            background: var(--bg-sidebar);
-        }
-
-        #main-view {
-            flex-grow: 1;
-            background: var(--bg-main);
-            position: relative;
-        }
-
-        /* 3. CONTROLS & TYPOGRAPHY */
-        h1 { font-size: 1.25rem; font-weight: 800; margin: 0 0 20px 0; letter-spacing: -0.025em; color: var(--accent); }
-        
-        .controls {
-            background: var(--bg-card);
-            padding: 16px;
-            border-radius: 12px;
-            border: 1px solid var(--border);
-            margin-bottom: 16px;
-            box-shadow: var(--shadow);
-        }
-
-        .search-row { display: flex; gap: 8px; margin-bottom: 12px; }
-        
-        input {
-            background: var(--bg-input);
-            border: 1px solid var(--border);
-            color: var(--text-main);
-            padding: 10px 12px;
-            border-radius: 8px;
-            flex-grow: 1;
-            font-size: 14px;
-            font-family: inherit;
-        }
-
-        button {
-            background: var(--accent);
-            color: #000;
-            border: none;
-            padding: 10px 16px;
-            font-weight: 700;
-            border-radius: 8px;
-            cursor: pointer;
-            font-size: 13px;
-            transition: opacity 0.2s;
-        }
-        button:hover { opacity: 0.9; }
-        .btn-outline { background: transparent; border: 1px solid var(--accent); color: var(--accent); width: 100%; }
-
-        /* 4. RESULT CARDS */
-        #results { flex-grow: 1; overflow-y: auto; padding-right: 4px; }
-        
-        .card {
-            background: var(--bg-card);
-            border: 1px solid var(--border);
-            padding: 14px;
-            margin-bottom: 10px;
-            border-radius: 10px;
-            cursor: pointer;
-            transition: all 0.2s;
-            box-shadow: var(--shadow);
-        }
-        .card:hover { border-color: var(--accent); transform: translateY(-1px); }
-        .card.active { border-color: var(--accent); background: var(--bg-sidebar); ring: 2px var(--accent); }
-
-        .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
-        .symbol { font-size: 15px; font-weight: 700; color: var(--text-main); }
-        .price { font-size: 14px; font-weight: 500; color: var(--text-muted); }
-        
-        .status-badge {
-            display: inline-block;
-            font-size: 11px;
-            font-weight: 700;
-            padding: 2px 8px;
-            border-radius: 6px;
-            text-transform: uppercase;
-            margin-bottom: 8px;
-        }
-
-        .metrics { font-size: 12px; color: var(--text-muted); display: flex; gap: 12px; }
-        .metrics b { color: var(--text-main); }
-
-        /* Progress Bar */
-        #progress-container { height: 4px; background: var(--border); border-radius: 2px; margin-bottom: 10px; overflow: hidden; }
-        #progress-bar { height: 100%; background: var(--accent); width: 0%; transition: width 0.3s; }
-
-        #chart-container { width: 100%; height: 100%; }
-        .empty-state { display: flex; align-items: center; justify-content: center; height: 100%; color: var(--text-muted); font-size: 14px; }
-    </style>
-</head>
-<body>
-
-    <div id="sidebar">
-        <h1>WHALE INTEL 300</h1>
-        
-        <div class="controls">
-            <div class="search-row">
-                <input type="text" id="symbolInput" placeholder="Enter Symbol (e.g. RAVE)">
-                <button onclick="manualScan()">SEARCH</button>
-            </div>
-            <button class="btn-outline" onclick="startFullScan()">START 300 TOKEN MACRO SCAN</button>
-        </div>
-
-        <div id="progress-container"><div id="progress-bar"></div></div>
-        <div id="status" style="font-size: 12px; color: var(--text-muted); margin-bottom: 15px;">Scanner Ready</div>
-        
-        <div id="results">
-            <!-- Results injected here -->
-        </div>
-    </div>
-
-    <div id="main-view">
-        <div id="chart-container" class="empty-state">Select a token to view the 30D Macro Chart</div>
-    </div>
-
-    <script>
-        const THEME = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-
-        async function startFullScan() {
-            const resDiv = document.getElementById('results');
-            const status = document.getElementById('status');
-            const progress = document.getElementById('progress-bar');
+<!-- Inside the renderResults function, update the div.innerHTML -->
+<script>
+    function renderResults(data, prepend = false) {
+        const resDiv = document.getElementById('results');
+        data.forEach(coin => {
+            const div = document.createElement('div');
+            div.className = 'card';
+            div.onclick = () => loadChart(coin.symbol, div);
             
-            resDiv.innerHTML = "";
-            progress.style.width = "0%";
-            
-            const total = 300;
-            const step = 50;
+            let badgeStyle = `background: var(--text-muted); color: #fff;`;
+            if(coin.status.includes('ACCUMULATION')) badgeStyle = `background: var(--accent); color: #000;`;
+            if(coin.status.includes('DISTRIBUTION')) badgeStyle = `background: var(--danger); color: #fff;`;
+            if(coin.status.includes('SPIKE')) badgeStyle = `background: var(--warning); color: #000;`;
 
-            for (let i = 0; i < total; i += step) {
-                status.innerText = `Scanning Index ${i} to ${i + step}...`;
-                try {
-                    const response = await fetch(`/api/scan?start=${i}&end=${i + step}`);
-                    const data = await response.json();
-                    renderResults(data);
-                    progress.style.width = ((i + step) / total * 100) + "%";
-                } catch (e) { console.error(e); }
-            }
-            status.innerText = "Scan Complete.";
-        }
-
-        async function manualScan() {
-            const sym = document.getElementById('symbolInput').value.trim();
-            if(!sym) return;
-            document.getElementById('status').innerText = `Searching ${sym}...`;
-            const response = await fetch(`/api/scan?symbol=${sym}`);
-            const data = await response.json();
-            renderResults(data, true);
-            document.getElementById('status').innerText = "Search Complete.";
-        }
-
-        function renderResults(data, prepend = false) {
-            const resDiv = document.getElementById('results');
-            data.forEach(coin => {
-                const div = document.createElement('div');
-                div.className = 'card';
-                div.onclick = () => loadChart(coin.symbol, div);
-                
-                // Set badge colors based on status
-                let badgeStyle = `background: var(--text-muted); color: #fff;`;
-                if(coin.status.includes('ACCUMULATION')) badgeStyle = `background: var(--accent); color: #000;`;
-                if(coin.status.includes('DISTRIBUTION')) badgeStyle = `background: var(--danger); color: #fff;`;
-                if(coin.status.includes('SPIKE')) badgeStyle = `background: var(--warning); color: #000;`;
-
-                div.innerHTML = `
-                    <div class="card-header">
-                        <span class="symbol">${coin.symbol}/USDT</span>
-                        <span class="price">$${coin.price}</span>
-                    </div>
-                    <span class="status-badge" style="${badgeStyle}">${coin.status}</span>
-                    <div class="metrics">
-                        <span>Vol: <b>${coin.volatility}</b></span>
-                        <span>Money Flow: <b>${coin.adScore}</b></span>
-                    </div>
-                `;
-                if(prepend) resDiv.prepend(div); else resDiv.appendChild(div);
-            });
-        }
-
-        function loadChart(symbol, element) {
-            document.querySelectorAll('.card').forEach(c => c.classList.remove('active'));
-            element.classList.add('active');
-
-            new TradingView.widget({
-                "autosize": true,
-                "symbol": "MEXC:" + symbol + "USDT.P",
-                "interval": "D",
-                "theme": THEME,
-                "style": "1",
-                "container_id": "chart-container",
-                "hide_side_toolbar": false,
-                "allow_symbol_change": true,
-                "save_image": false,
-            });
-        }
-    </script>
-</body>
-</html>
+            div.innerHTML = `
+                <div class="card-header">
+                    <span class="symbol">${coin.symbol}/USDT</span>
+                    <span class="price">$${coin.price}</span>
+                </div>
+                <span class="status-badge" style="${badgeStyle}">${coin.status}</span>
+                <div class="metrics">
+                    <span>Vol: <b>${coin.volatility}</b></span>
+                    <span>Money Flow: <b>${coin.adScore}</b></span>
+                </div>
+                <!-- THE NEW CONCISE CONCLUSION -->
+                <div class="conclusion">
+                    <strong>Conclusion:</strong> ${coin.explanation}
+                </div>
+            `;
+            if(prepend) resDiv.prepend(div); else resDiv.appendChild(div);
+        });
+    }
+</script>
