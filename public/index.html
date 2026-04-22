@@ -2,54 +2,83 @@
 <html>
 <head>
     <title>God Candle Scanner</title>
+    <!-- Include TradingView Library -->
+    <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
     <style>
-        body { background: #0b0e11; color: #00ff88; font-family: 'Courier New', monospace; padding: 40px; }
-        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 20px; }
-        .card { border: 1px solid #2b2f36; padding: 20px; border-radius: 12px; background: #181a20; transition: 0.3s; }
-        .card:hover { border-color: #00ff88; transform: translateY(-5px); }
-        .fire { border: 2px solid #ffaa00; box-shadow: 0 0 15px rgba(255, 170, 0, 0.3); }
-        .fire h3 { color: #ffaa00; }
-        button { background: #00ff88; color: #000; border: none; padding: 18px 40px; font-weight: 900; cursor: pointer; border-radius: 8px; font-size: 16px; margin-bottom: 30px; }
-        a { color: #00ff88; text-decoration: none; font-size: 12px; border: 1px solid #00ff88; padding: 5px; border-radius: 4px; display: inline-block; margin-top: 10px; }
+        body { background: #0b0e11; color: #00ff88; font-family: monospace; margin: 0; display: flex; height: 100vh; overflow: hidden; }
+        #sidebar { width: 350px; border-right: 1px solid #2b3139; padding: 20px; overflow-y: auto; background: #181a20; }
+        #main-view { flex-grow: 1; display: flex; flex-direction: column; background: #000; }
+        .card { border: 1px solid #2b2f36; padding: 15px; margin-bottom: 15px; border-radius: 8px; cursor: pointer; transition: 0.2s; }
+        .card:hover { background: #2b3139; border-color: #00ff88; }
+        .active-card { border-color: #00ff88; background: #2b3139; }
+        .fire { border-left: 5px solid #ffaa00; }
+        button { background: #00ff88; color: #000; border: none; padding: 15px; width: 100%; font-weight: bold; cursor: pointer; margin-bottom: 20px; }
+        #chart-container { flex-grow: 1; width: 100%; height: 100%; }
+        .no-chart { display: flex; align-items: center; justify-content: center; height: 100%; color: #555; }
     </style>
 </head>
 <body>
-    <h1>MEXC WHALE SCANNER</h1>
-    <p>Detecting "Coiled Springs" before the God Candle.</p>
-    <button onclick="runScan()">SCAN FOR ACCUMULATION</button>
-    <div class="grid" id="results"></div>
+
+    <div id="sidebar">
+        <h2>RAVE SCANNER</h2>
+        <button onclick="runScan()">SCAN MID-CAPS</button>
+        <div id="results"></div>
+    </div>
+
+    <div id="main-view">
+        <div id="chart-container">
+            <div class="no-chart">Click a coin on the left to see the 1D Chart</div>
+        </div>
+    </div>
 
     <script>
         async function runScan() {
             const btn = document.querySelector('button');
             const resDiv = document.getElementById('results');
-            btn.innerText = "SCANNING MEXC FUTURES...";
+            btn.innerText = "SEARCHING...";
             resDiv.innerHTML = "";
 
             try {
                 const response = await fetch('/api/scan');
                 const data = await response.json();
                 
-                if(data.length === 0) {
-                    resDiv.innerHTML = "No patterns found right now. Try again in 1 hour.";
-                }
+                data.sort((a, b) => parseFloat(a.volatility) - parseFloat(b.volatility)); // Sort by lowest vol
 
                 data.forEach(coin => {
                     const div = document.createElement('div');
-                    div.className = `card ${coin.volumeAlert.includes('🔥') ? 'fire' : ''}`;
+                    div.className = `card ${coin.status.includes('🔥') ? 'fire' : ''}`;
+                    div.onclick = () => loadChart(coin.symbol, div);
                     div.innerHTML = `
-                        <h3>${coin.symbol}</h3>
-                        <p>Volatility: ${coin.volatility} (Low)</p>
-                        <p>Status: ${coin.volumeAlert}</p>
-                        <p>Price: $${coin.price}</p>
-                        <a href="${coin.link}" target="_blank">OPEN CHART</a>
+                        <strong>${coin.symbol}USDT</strong><br>
+                        <small>Volatilty: ${coin.volatility}</small><br>
+                        <small style="color:${coin.status.includes('🔥') ? '#ffaa00' : '#888'}">${coin.status}</small>
                     `;
                     resDiv.appendChild(div);
                 });
-            } catch (e) { 
-                alert("Scan failed. Error: " + e.message); 
-            }
-            btn.innerText = "SCAN FOR ACCUMULATION";
+            } catch (e) { alert("Error: " + e.message); }
+            btn.innerText = "SCAN MID-CAPS";
+        }
+
+        function loadChart(symbol, element) {
+            // Highlight active card
+            document.querySelectorAll('.card').forEach(c => c.classList.remove('active-card'));
+            element.classList.add('active-card');
+
+            // Load TradingView Widget
+            new TradingView.widget({
+                "autosize": true,
+                "symbol": "MEXC:" + symbol + "USDT.P",
+                "interval": "D",
+                "timezone": "Etc/UTC",
+                "theme": "dark",
+                "style": "1",
+                "locale": "en",
+                "toolbar_bg": "#f1f3f6",
+                "enable_publishing": false,
+                "hide_side_toolbar": false,
+                "allow_symbol_change": true,
+                "container_id": "chart-container"
+            });
         }
     </script>
 </body>

@@ -2,57 +2,52 @@ const axios = require('axios');
 
 export default async function handler(req, res) {
     try {
-        // 1. Get MEXC Futures symbols (perpetual USDT pairs)
         const exchangeRes = await axios.get('https://contract.mexc.com/api/v1/contract/detail');
         
-        // Filter for USDT pairs and take a sample to scan
-        const symbols = exchangeRes.data.data
+        // Logic: Skip the first 20 coins (BTC, ETH, etc.) to find the "Hidden Gems"
+        // Then take a random sample of 60 coins from the mid-cap list
+        const allSymbols = exchangeRes.data.data
             .filter(s => s.quoteCoin === 'USDT' && s.state === 0)
-            .map(s => s.symbol)
-            .slice(0, 40); // Scans 40 coins
+            .map(s => s.symbol);
+
+        const targetSymbols = allSymbols.slice(20, 100); 
 
         const candidates = [];
 
-        // 2. Fetch historical data for each
-        await Promise.all(symbols.map(async (symbol) => {
+        await Promise.all(targetSymbols.map(async (symbol) => {
             try {
-                // MEXC Klines: interval 'Day1'
                 const klineRes = await axios.get(`https://contract.mexc.com/api/v1/contract/kline/${symbol}?interval=Day1`);
                 const klines = klineRes.data.data;
 
-                if (!klines || klines.time.length < 30) return;
+                if (!klines || klines.time.length < 20) return;
 
-                // Close prices and Volumes are in separate arrays in MEXC API
                 const closes = klines.close;
                 const volumes = klines.vol;
 
-                // 3. Logic: Volatility (Last 10 Days)
+                // Tighter Volatility Logic: Look for "Flatline" (< 2.5% variation)
                 const last10 = closes.slice(-10);
                 const avg = last10.reduce((a, b) => a + b) / 10;
                 const variance = last10.reduce((a, b) => a + Math.pow(b - avg, 2), 0) / 10;
                 const volatility = Math.sqrt(variance) / avg;
 
-                // 4. Logic: Volume Lead-in
                 const avgVol = volumes.reduce((a, b) => a + b) / volumes.length;
                 const currentVol = volumes[volumes.length - 1];
 
-                // FIND THE RAVE PATTERN: Low Volatility + Rising Volume
-                if (volatility < 0.04) {
+                // If volatility is extremely low, it's a candidate
+                if (volatility < 0.025) { 
                     candidates.push({
                         symbol: symbol.replace('_USDT', ''),
+                        mexcSymbol: symbol,
                         volatility: (volatility * 100).toFixed(2) + "%",
-                        volumeAlert: currentVol > avgVol * 1.5 ? "🔥 WHALE SPOTTED" : "💤 COILING",
-                        price: closes[closes.length - 1],
-                        link: `https://www.mexc.com/exchange/${symbol}`
+                        status: currentVol > avgVol * 1.2 ? "🔥 ACCUMULATION" : "💤 COILING",
+                        price: closes[closes.length - 1]
                     });
                 }
-            } catch (e) {
-                // Skip errors
-            }
+            } catch (e) {}
         }));
 
         res.status(200).json(candidates);
     } catch (err) {
-        res.status(500).json({ error: "MEXC API is down or blocked. Error: " + err.message });
+        res.status(500).json({ error: err.message });
     }
 }
