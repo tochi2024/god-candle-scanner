@@ -16,7 +16,7 @@ export default async function handler(req, res) {
 
         await Promise.all(targetSymbols.map(async (symbol) => {
             try {
-                const klineRes = await axios.get(`https://contract.mexc.com/api/v1/contract/kline/${symbol}?interval=Day1`, { timeout: 4000 });
+                const klineRes = await axios.get(`https://contract.mexc.com/api/v1/contract/kline/${symbol}?interval=Day1`, { timeout: 5000 });
                 const k = klineRes.data.data;
                 if (!k || k.time.length < 30) return;
 
@@ -40,7 +40,6 @@ export default async function handler(req, res) {
                 let color = "#888";
                 let explanation = "Market is in balance. No clear whale footprint detected.";
 
-                // LOGIC ENGINE FOR EXPLANATIONS
                 if (isFlat && adTrend > 0) {
                     status = "💎 ACCUMULATION";
                     color = "#10b981";
@@ -70,7 +69,7 @@ export default async function handler(req, res) {
                         color,
                         price: k.close[k.close.length - 1],
                         adScore: Math.round(adTrend),
-                        explanation // The new concise conclusion
+                        explanation
                     });
                 }
             } catch (e) {}
