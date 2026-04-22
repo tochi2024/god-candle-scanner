@@ -1,38 +1,37 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Whale Scanner Pro</title>
+    <title>Whale Intel Macro Scanner</title>
     <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
     <style>
-        body { background: #0b0e11; color: #00ff88; font-family: monospace; margin: 0; display: flex; height: 100vh; overflow: hidden; }
-        #sidebar { width: 350px; border-right: 1px solid #2b3139; padding: 20px; overflow-y: auto; background: #181a20; }
+        body { background: #0b0e11; color: #fff; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; margin: 0; display: flex; height: 100vh; overflow: hidden; }
+        #sidebar { width: 400px; border-right: 1px solid #2b3139; padding: 15px; overflow-y: auto; background: #121418; display: flex; flex-direction: column; }
         #main-view { flex-grow: 1; background: #000; }
-        .search-box { display: flex; gap: 5px; margin-bottom: 15px; }
-        input { background: #000; border: 1px solid #2b3139; color: #00ff88; padding: 10px; flex-grow: 1; border-radius: 4px; }
-        .card { border: 1px solid #2b2f36; padding: 12px; margin-bottom: 10px; border-radius: 6px; cursor: pointer; font-size: 13px; }
-        .card:hover { border-color: #00ff88; background: #2b3139; }
-        .active-card { border-color: #00ff88; background: #2b3139; box-shadow: inset 0 0 10px rgba(0,255,136,0.2); }
-        .tag { font-size: 10px; padding: 2px 5px; border-radius: 3px; margin-right: 5px; font-weight: bold; }
-        .perfect { background: #00ff88; color: #000; }
-        .coiling { background: #333; color: #00ff88; border: 1px solid #00ff88; }
-        .absorption { color: #ffaa00; }
-        button { background: #00ff88; color: #000; border: none; padding: 12px; font-weight: bold; cursor: pointer; width: 100%; border-radius: 4px; margin-bottom: 10px; }
+        .controls { background: #181a20; padding: 15px; border-radius: 8px; margin-bottom: 15px; }
+        input { background: #000; border: 1px solid #333; color: #00ff88; padding: 10px; width: 60%; border-radius: 4px; outline: none; }
+        button { background: #00ff88; color: #000; border: none; padding: 10px 15px; font-weight: bold; cursor: pointer; border-radius: 4px; }
+        .results-container { flex-grow: 1; overflow-y: auto; }
+        .card { border: 1px solid #2b2f36; padding: 12px; margin-bottom: 8px; border-radius: 6px; cursor: pointer; transition: 0.2s; font-size: 13px; }
+        .card:hover { border-color: #00ff88; background: #1c1f25; }
+        .active-card { border-color: #00ff88 !important; background: #1c1f25; box-shadow: 0 0 10px rgba(0,255,136,0.1); }
+        .badge { font-size: 9px; font-weight: bold; padding: 2px 6px; border-radius: 10px; margin-top: 5px; display: inline-block; text-transform: uppercase; }
         #chart-container { width: 100%; height: 100%; }
+        .loader { color: #888; font-size: 12px; text-align: center; margin: 10px 0; }
     </style>
 </head>
 <body>
 
     <div id="sidebar">
-        <h2 style="margin-top:0">WHALE SCANNER</h2>
+        <h2 style="color:#00ff88; margin-top:0">WHALE INTEL PRO</h2>
         
-        <div class="search-box">
-            <input type="text" id="symbolInput" placeholder="Manual Symbol (e.g. PEPE)">
-            <button style="width:auto; margin:0" onclick="manualScan()">GO</button>
+        <div class="controls">
+            <input type="text" id="symbolInput" placeholder="Symbol (e.g. BTC)">
+            <button onclick="manualScan()">SEARCH</button>
+            <button onclick="runScan()" style="width:100%; margin-top:10px">SCAN 300 TOKENS (HIGH/MID)</button>
         </div>
 
-        <button onclick="runScan()">AUTO-SCAN (150 TOKENS)</button>
-        <div id="status" style="font-size:11px; margin-bottom:10px; color:#888"></div>
-        <div id="results"></div>
+        <div id="status" class="loader">Idle</div>
+        <div class="results-container" id="results"></div>
     </div>
 
     <div id="main-view">
@@ -42,35 +41,39 @@
     <script>
         async function runScan(manualSymbol = "") {
             const resDiv = document.getElementById('results');
-            const status = document.getElementById('status');
-            status.innerText = manualSymbol ? `Scanning ${manualSymbol}...` : "Scanning 150 mid-caps...";
+            const statusDiv = document.getElementById('status');
+            statusDiv.innerText = manualSymbol ? "Hunting for " + manualSymbol + "..." : "Scanning entire market (300 pairs)...";
             
             try {
                 const url = manualSymbol ? `/api/scan?symbol=${manualSymbol}` : '/api/scan';
                 const response = await fetch(url);
                 const data = await response.json();
                 
-                if (!manualSymbol) resDiv.innerHTML = ""; // Clear list only for auto-scans
+                if (!manualSymbol) resDiv.innerHTML = ""; 
+
+                // Sort by Accumulation status first
+                data.sort((a,b) => (a.status === '💎 ACCUMULATION' ? -1 : 1));
 
                 data.forEach(coin => {
                     const div = document.createElement('div');
                     div.className = `card`;
                     div.onclick = () => loadChart(coin.symbol, div);
                     div.innerHTML = `
-                        <div style="display:flex; justify-content:space-between">
-                            <strong>${coin.symbol}/USDT</strong>
-                            <span>$${coin.price}</span>
+                        <div style="display:flex; justify-content:space-between; align-items:center">
+                            <strong>${coin.symbol}USDT</strong>
+                            <span style="color:#888">$${coin.price}</span>
                         </div>
-                        <div style="margin-top:5px">
-                            <span class="tag ${coin.status === '💎 PERFECT BASE' ? 'perfect' : 'coiling'}">${coin.status}</span>
-                            <span class="absorption" style="font-size:11px">${coin.volumeAlert}</span>
+                        <div class="badge" style="border: 1px solid ${coin.color}; color: ${coin.color}">
+                            ${coin.status}
                         </div>
-                        <div style="font-size:10px; color:#555; margin-top:5px">Volatility: ${coin.volatility}</div>
+                        <div style="font-size:10px; color:#555; margin-top:5px">
+                            Volatility: ${coin.volatility} | Money Flow: ${coin.adScore}
+                        </div>
                     `;
-                    resDiv.prepend(div); // Newest or manual searches go to top
+                    resDiv.prepend(div);
                 });
-                status.innerText = `Scan complete. Found ${data.length} candidates.`;
-            } catch (e) { status.innerText = "Scan error."; }
+                statusDiv.innerText = `Scan Finished. ${data.length} Signals found.`;
+            } catch (e) { statusDiv.innerText = "Timeout. Try Scanning in 30 seconds."; }
         }
 
         function manualScan() {
@@ -88,7 +91,6 @@
                 "interval": "D",
                 "theme": "dark",
                 "style": "1",
-                "locale": "en",
                 "container_id": "chart-container"
             });
         }
