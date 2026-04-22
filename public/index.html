@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Whale Accumulation Scanner</title>
+    <style>
+        body { background: #0f0f0f; color: #00ff88; font-family: monospace; padding: 40px; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 20px; }
+        .card { border: 1px solid #333; padding: 20px; border-radius: 10px; background: #1a1a1a; }
+        .fire { color: #ffcc00; font-weight: bold; border-color: #ffcc00; }
+        button { background: #00ff88; color: black; border: none; padding: 15px 30px; font-weight: bold; cursor: pointer; border-radius: 5px; margin-bottom: 20px; }
+    </style>
+</head>
+<body>
+    <h1>RAVE-PATTERN SCANNER (1D)</h1>
+    <button onclick="runScan()">SEARCH FOR COILED SPRINGS</button>
+    <div id="status"></div>
+    <div class="grid" id="results"></div>
+
+    <script>
+        async function runScan() {
+            const btn = document.querySelector('button');
+            const resDiv = document.getElementById('results');
+            btn.innerText = "SCANNING BINANCE...";
+            resDiv.innerHTML = "";
+
+            try {
+                const response = await fetch('/api/scan');
+                const data = await response.json();
+                
+                data.forEach(coin => {
+                    const div = document.createElement('div');
+                    div.className = `card ${coin.volumeAlert.includes('🔥') ? 'fire' : ''}`;
+                    div.innerHTML = `
+                        <h3>${coin.symbol}</h3>
+                        <p>Volatility: ${coin.volatility}</p>
+                        <p>Volume: ${coin.volumeAlert}</p>
+                        <p>Price: $${coin.price}</p>
+                    `;
+                    resDiv.appendChild(div);
+                });
+            } catch (e) { alert("Scan failed. Try again."); }
+            btn.innerText = "SEARCH FOR COILED SPRINGS";
+        }
+    </script>
+</body>
+</html>
