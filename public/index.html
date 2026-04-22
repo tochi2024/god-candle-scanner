@@ -1,82 +1,94 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>God Candle Scanner</title>
-    <!-- Include TradingView Library -->
+    <title>Whale Scanner Pro</title>
     <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
     <style>
         body { background: #0b0e11; color: #00ff88; font-family: monospace; margin: 0; display: flex; height: 100vh; overflow: hidden; }
         #sidebar { width: 350px; border-right: 1px solid #2b3139; padding: 20px; overflow-y: auto; background: #181a20; }
-        #main-view { flex-grow: 1; display: flex; flex-direction: column; background: #000; }
-        .card { border: 1px solid #2b2f36; padding: 15px; margin-bottom: 15px; border-radius: 8px; cursor: pointer; transition: 0.2s; }
-        .card:hover { background: #2b3139; border-color: #00ff88; }
-        .active-card { border-color: #00ff88; background: #2b3139; }
-        .fire { border-left: 5px solid #ffaa00; }
-        button { background: #00ff88; color: #000; border: none; padding: 15px; width: 100%; font-weight: bold; cursor: pointer; margin-bottom: 20px; }
-        #chart-container { flex-grow: 1; width: 100%; height: 100%; }
-        .no-chart { display: flex; align-items: center; justify-content: center; height: 100%; color: #555; }
+        #main-view { flex-grow: 1; background: #000; }
+        .search-box { display: flex; gap: 5px; margin-bottom: 15px; }
+        input { background: #000; border: 1px solid #2b3139; color: #00ff88; padding: 10px; flex-grow: 1; border-radius: 4px; }
+        .card { border: 1px solid #2b2f36; padding: 12px; margin-bottom: 10px; border-radius: 6px; cursor: pointer; font-size: 13px; }
+        .card:hover { border-color: #00ff88; background: #2b3139; }
+        .active-card { border-color: #00ff88; background: #2b3139; box-shadow: inset 0 0 10px rgba(0,255,136,0.2); }
+        .tag { font-size: 10px; padding: 2px 5px; border-radius: 3px; margin-right: 5px; font-weight: bold; }
+        .perfect { background: #00ff88; color: #000; }
+        .coiling { background: #333; color: #00ff88; border: 1px solid #00ff88; }
+        .absorption { color: #ffaa00; }
+        button { background: #00ff88; color: #000; border: none; padding: 12px; font-weight: bold; cursor: pointer; width: 100%; border-radius: 4px; margin-bottom: 10px; }
+        #chart-container { width: 100%; height: 100%; }
     </style>
 </head>
 <body>
 
     <div id="sidebar">
-        <h2>RAVE SCANNER</h2>
-        <button onclick="runScan()">SCAN MID-CAPS</button>
+        <h2 style="margin-top:0">WHALE SCANNER</h2>
+        
+        <div class="search-box">
+            <input type="text" id="symbolInput" placeholder="Manual Symbol (e.g. PEPE)">
+            <button style="width:auto; margin:0" onclick="manualScan()">GO</button>
+        </div>
+
+        <button onclick="runScan()">AUTO-SCAN (150 TOKENS)</button>
+        <div id="status" style="font-size:11px; margin-bottom:10px; color:#888"></div>
         <div id="results"></div>
     </div>
 
     <div id="main-view">
-        <div id="chart-container">
-            <div class="no-chart">Click a coin on the left to see the 1D Chart</div>
-        </div>
+        <div id="chart-container"></div>
     </div>
 
     <script>
-        async function runScan() {
-            const btn = document.querySelector('button');
+        async function runScan(manualSymbol = "") {
             const resDiv = document.getElementById('results');
-            btn.innerText = "SEARCHING...";
-            resDiv.innerHTML = "";
-
+            const status = document.getElementById('status');
+            status.innerText = manualSymbol ? `Scanning ${manualSymbol}...` : "Scanning 150 mid-caps...";
+            
             try {
-                const response = await fetch('/api/scan');
+                const url = manualSymbol ? `/api/scan?symbol=${manualSymbol}` : '/api/scan';
+                const response = await fetch(url);
                 const data = await response.json();
                 
-                data.sort((a, b) => parseFloat(a.volatility) - parseFloat(b.volatility)); // Sort by lowest vol
+                if (!manualSymbol) resDiv.innerHTML = ""; // Clear list only for auto-scans
 
                 data.forEach(coin => {
                     const div = document.createElement('div');
-                    div.className = `card ${coin.status.includes('🔥') ? 'fire' : ''}`;
+                    div.className = `card`;
                     div.onclick = () => loadChart(coin.symbol, div);
                     div.innerHTML = `
-                        <strong>${coin.symbol}USDT</strong><br>
-                        <small>Volatilty: ${coin.volatility}</small><br>
-                        <small style="color:${coin.status.includes('🔥') ? '#ffaa00' : '#888'}">${coin.status}</small>
+                        <div style="display:flex; justify-content:space-between">
+                            <strong>${coin.symbol}/USDT</strong>
+                            <span>$${coin.price}</span>
+                        </div>
+                        <div style="margin-top:5px">
+                            <span class="tag ${coin.status === '💎 PERFECT BASE' ? 'perfect' : 'coiling'}">${coin.status}</span>
+                            <span class="absorption" style="font-size:11px">${coin.volumeAlert}</span>
+                        </div>
+                        <div style="font-size:10px; color:#555; margin-top:5px">Volatility: ${coin.volatility}</div>
                     `;
-                    resDiv.appendChild(div);
+                    resDiv.prepend(div); // Newest or manual searches go to top
                 });
-            } catch (e) { alert("Error: " + e.message); }
-            btn.innerText = "SCAN MID-CAPS";
+                status.innerText = `Scan complete. Found ${data.length} candidates.`;
+            } catch (e) { status.innerText = "Scan error."; }
+        }
+
+        function manualScan() {
+            const sym = document.getElementById('symbolInput').value;
+            if(sym) runScan(sym);
         }
 
         function loadChart(symbol, element) {
-            // Highlight active card
             document.querySelectorAll('.card').forEach(c => c.classList.remove('active-card'));
             element.classList.add('active-card');
 
-            // Load TradingView Widget
             new TradingView.widget({
                 "autosize": true,
                 "symbol": "MEXC:" + symbol + "USDT.P",
                 "interval": "D",
-                "timezone": "Etc/UTC",
                 "theme": "dark",
                 "style": "1",
                 "locale": "en",
-                "toolbar_bg": "#f1f3f6",
-                "enable_publishing": false,
-                "hide_side_toolbar": false,
-                "allow_symbol_change": true,
                 "container_id": "chart-container"
             });
         }
