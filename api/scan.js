@@ -1,55 +1,66 @@
 const axios = require('axios');
 
+// These headers make the request look like it's coming from a real Google Chrome browser
+const browserHeaders = {
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36',
+    'Accept': 'application/json',
+    'Accept-Language': 'en-US,en;q=0.9',
+    'Referer': 'https://www.bybit.com/'
+};
+
 export default async function handler(req, res) {
     try {
-        // 1. Get List of Bybit Perpetual Pairs (Linear USDT)
-        // Bybit doesn't block Vercel IPs, so 451 error is gone.
-        const exchangeRes = await axios.get('https://api.bybit.com/v5/market/instruments-info?category=linear');
+        // 1. Get Symbols with Browser Headers
+        const exchangeRes = await axios.get('https://api.bybit.com/v5/market/instruments-info?category=linear', {
+            headers: browserHeaders
+        });
+
         const symbols = exchangeRes.data.result.list
             .filter(s => s.quoteCoin === 'USDT' && s.status === 'Trading')
             .map(s => s.symbol)
-            .slice(0, 20); // Scanning 20 pairs to stay fast
+            .slice(0, 15); // Scans 15 coins to stay safe
 
         const candidates = [];
 
-        // 2. Scan each coin for the RAVE pattern
-        await Promise.all(symbols.map(async (symbol) => {
+        for (const symbol of symbols) {
             try {
-                // Fetch Daily Candles (Klines)
-                const klineRes = await axios.get(`https://api.bybit.com/v5/market/kline?category=linear&symbol=${symbol}&interval=D&limit=30`);
-                const klines = klineRes.data.result.list; // Bybit returns newest first
-
-                // We need 30 days of Close prices and Volume
+                // Fetch Candles
+                const klineRes = await axios.get(`https://api.bybit.com/v5/market/kline?category=linear&symbol=${symbol}&interval=D&limit=30`, {
+                    headers: browserHeaders
+                });
+                
+                const klines = klineRes.data.result.list;
                 const closes = klines.map(k => parseFloat(k[4])).reverse();
                 const volumes = klines.map(k => parseFloat(k[5])).reverse();
 
-                // 3. Logic: Volatility Compression (Last 10 days)
                 const last10 = closes.slice(-10);
                 const avg = last10.reduce((a, b) => a + b) / 10;
                 const variance = last10.reduce((a, b) => a + Math.pow(b - avg, 2), 0) / 10;
                 const volatility = Math.sqrt(variance) / avg;
 
-                // 4. Logic: Volume Absorption Check
                 const avgVol = volumes.reduce((a, b) => a + b) / 30;
                 const currentVol = volumes[29];
 
-                // If volatility < 4%, it's a Coiled Spring
                 if (volatility < 0.04) {
                     candidates.push({
                         symbol,
                         volatility: (volatility * 100).toFixed(2) + "%",
-                        volumeAlert: currentVol > avgVol * 1.5 ? "🔥 HIGH ABSORPTION" : "💤 QUIET",
+                        volumeAlert: currentVol > avgVol * 1.3 ? "🔥 HIGH ABSORPTION" : "💤 QUIET",
                         price: closes[29]
                     });
                 }
+                
+                // Small sleep to avoid 403 rate limits
+                await new Promise(r => setTimeout(r, 100));
+
             } catch (e) {
-                // Skip failed symbols
+                continue; // Skip if one coin fails
             }
-        }));
+        }
 
         res.status(200).json(candidates);
     } catch (err) {
         console.error("Main Error:", err.message);
-        res.status(500).json({ error: "API connection failed. Bybit might be busy." });
+        res.status(500).json({ error: "Access Denied (403). Try changing Vercel Region." });
     }
 }
