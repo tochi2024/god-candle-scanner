@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Whale Intel Pro | Gem Zone Scanner</title>
+    <title>Whale Intel Pro | Intelligence Terminal</title>
     <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
     <style>
         :root {
@@ -141,13 +141,13 @@
 <body>
 
     <div id="sidebar">
-        <h1>WHALE INTEL 300</h1>
+        <h1>WHALE INTEL 30</h1>
         <div class="controls">
             <div class="search-row">
                 <input type="text" id="symbolInput" placeholder="Symbol (e.g. RAVE)">
                 <button onclick="manualScan()">SEARCH</button>
             </div>
-            <button class="btn-outline" onclick="startFullScan()">SCAN GEM ZONE (RANK 50-400)</button>
+            <button class="btn-outline" onclick="startFullScan()">FIND TOP 30 SIGNALS</button>
         </div>
         <div id="progress-container"><div id="progress-bar"></div></div>
         <div id="status" style="font-size: 11px; color: var(--text-muted); margin-bottom: 15px;">Scanner Ready</div>
@@ -160,26 +160,46 @@
 
     <script>
         const THEME = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+        let totalFound = 0;
 
         async function startFullScan() {
             const resDiv = document.getElementById('results');
             const progress = document.getElementById('progress-bar');
             const status = document.getElementById('status');
-            resDiv.innerHTML = "";
             
-            const totalToScan = 350; // Range 50 to 400
-            const chunkSize = 50;
+            resDiv.innerHTML = "";
+            totalFound = 0;
+            progress.style.width = "0%";
+            
+            let currentIdx = 0;
+            const chunkSize = 30; // Scans 30 at a time for more accurate stopping
+            const maxIdx = 600; // Hard stop safety limit
 
-            for (let i = 0; i < totalToScan; i += chunkSize) {
-                status.innerText = `Scanning Gem Zone: Rank ${i + 50} to ${i + 50 + chunkSize}...`;
+            // Logic: Keep scanning until we find 30 tokens that are NOT neutral
+            while (totalFound < 30 && currentIdx < maxIdx) {
+                status.innerText = `Searching... Found ${totalFound}/30 (Scanning Ranks ${currentIdx+50}-${currentIdx+50+chunkSize})`;
+                
                 try {
-                    const response = await fetch(`/api/scan?start=${i}&end=${i + chunkSize}`);
+                    const response = await fetch(`/api/scan?start=${currentIdx}&end=${currentIdx + chunkSize}`);
                     const data = await response.json();
-                    renderResults(data);
-                    progress.style.width = ((i + chunkSize) / totalToScan * 100) + "%";
-                } catch (e) { console.error(e); }
+                    
+                    if (data.length > 0) {
+                        renderResults(data);
+                        totalFound += data.length;
+                    }
+                    
+                    currentIdx += chunkSize;
+                    progress.style.width = (totalFound / 30 * 100) + "%";
+                } catch (e) { 
+                    console.error("Batch failed", e);
+                    break;
+                }
             }
-            status.innerText = "Gem Zone Scan Complete.";
+            
+            progress.style.width = "100%";
+            status.innerText = totalFound >= 30 
+                ? "Target achieved: Top 30 signals identified." 
+                : `Scan ended. Found ${totalFound} signals within the top 600 tokens.`;
         }
 
         async function manualScan() {
