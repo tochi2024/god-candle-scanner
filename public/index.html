@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Whale Intel Pro | Advanced Scanner</title>
+    <title>Whale Intel Pro | Ultimate Terminal</title>
     <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
     <style>
         :root {
@@ -20,31 +20,32 @@
         body { background: var(--bg-main); color: var(--text-main); font-family: 'Inter', sans-serif; margin: 0; display: flex; height: 100vh; overflow: hidden; }
         #sidebar { width: 380px; border-right: 1px solid var(--border); padding: 20px; display: flex; flex-direction: column; background: var(--bg-sidebar); overflow-y: auto; }
         #main-view { flex-grow: 1; background: #000; position: relative; }
-        h1 { font-size: 1.1rem; font-weight: 900; color: var(--accent); margin: 0 0 15px 0; text-transform: uppercase; }
+        h1 { font-size: 1.1rem; font-weight: 900; color: var(--accent); margin: 0 0 15px 0; text-transform: uppercase; letter-spacing: 1px; }
         
-        .controls { background: var(--bg-card); padding: 15px; border-radius: 12px; border: 1px solid var(--border); margin-bottom: 15px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+        .controls { background: var(--bg-card); padding: 15px; border-radius: 12px; border: 1px solid var(--border); margin-bottom: 15px; }
         .row { display: flex; gap: 8px; margin-bottom: 10px; }
         input { background: transparent; border: 1px solid var(--border); color: var(--text-main); padding: 10px; border-radius: 8px; flex-grow: 1; }
-        
-        button { border: none; padding: 10px; font-weight: 700; border-radius: 8px; cursor: pointer; font-size: 12px; width: 100%; transition: transform 0.1s; }
-        button:active { transform: scale(0.98); }
+        button { border: none; padding: 10px; font-weight: 700; border-radius: 8px; cursor: pointer; font-size: 11px; width: 100%; text-transform: uppercase; }
         .btn-acc { background: var(--accent); color: #000; }
         .btn-dist { background: var(--danger); color: #fff; }
         .btn-search { background: var(--text-main); color: var(--bg-main); width: auto; }
 
-        .card { background: var(--bg-card); border: 1px solid var(--border); padding: 15px; margin-bottom: 12px; border-radius: 12px; cursor: pointer; }
-        .card:hover { border-color: var(--accent); }
+        .card { background: var(--bg-card); border: 1px solid var(--border); padding: 16px; margin-bottom: 12px; border-radius: 12px; cursor: pointer; transition: 0.2s; }
+        .card:hover { border-color: var(--accent); transform: translateY(-2px); }
         .card.active { border-color: var(--accent); background: var(--bg-sidebar); border-width: 2px; }
         
-        .badge { font-size: 10px; font-weight: 900; padding: 3px 8px; border-radius: 6px; text-transform: uppercase; margin: 8px 0; display: inline-block; }
+        .badge { font-size: 10px; font-weight: 900; padding: 4px 10px; border-radius: 6px; text-transform: uppercase; margin: 8px 0; display: inline-block; }
         
-        .plan-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px; background: rgba(120,120,120,0.05); padding: 10px; border-radius: 8px; }
-        .plan-item { font-size: 11px; color: var(--text-muted); }
-        .plan-item b { color: var(--text-main); display: block; font-size: 13px; }
-        .sl { border-left: 3px solid var(--danger); padding-left: 6px; }
-        .tp { border-left: 3px solid var(--accent); padding-left: 6px; }
+        .metrics-row { display: flex; gap: 15px; font-size: 12px; color: var(--text-muted); border-bottom: 1px solid var(--border); padding-bottom: 8px; margin-bottom: 8px; }
+        .metrics-row b { color: var(--text-main); }
 
-        #progress-bar { height: 4px; background: var(--accent); width: 0%; transition: 0.3s; margin-bottom: 10px; border-radius: 2px; }
+        .plan-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px; background: rgba(120,120,120,0.06); padding: 10px; border-radius: 8px; }
+        .plan-item { font-size: 11px; color: var(--text-muted); }
+        .plan-item b { color: var(--text-main); display: block; font-size: 13px; margin-top: 2px; }
+        .sl { border-left: 3px solid var(--danger); padding-left: 8px; }
+        .tp { border-left: 3px solid var(--accent); padding-left: 8px; }
+
+        #progress-bar { height: 4px; background: var(--accent); width: 0%; transition: 0.3s; margin-bottom: 10px; }
         #chart-container { width: 100%; height: 100%; }
     </style>
 </head>
@@ -54,7 +55,7 @@
         <h1>Whale Intelligence</h1>
         <div class="controls">
             <div class="row">
-                <input type="text" id="symbolInput" placeholder="RAVE, BTC, etc.">
+                <input type="text" id="symbolInput" placeholder="Enter Symbol (RAVE)">
                 <button class="btn-search" onclick="manualScan()">GO</button>
             </div>
             <div class="row">
@@ -63,7 +64,7 @@
             </div>
         </div>
         <div id="progress-bar"></div>
-        <div id="status" style="font-size:11px; color:var(--text-muted); margin-bottom:10px">Select a mode to start hunting.</div>
+        <div id="status" style="font-size:11px; color:var(--text-muted); margin-bottom:15px">Select a mode to begin scanning.</div>
         <div id="results"></div>
     </div>
 
@@ -86,7 +87,7 @@
             
             let currentIdx = 0;
             while (totalFound < 30 && currentIdx < 800) {
-                status.innerText = `Searching ${mode.toUpperCase()}... Found ${totalFound}/30 (Rank ${currentIdx+50}+)`;
+                status.innerText = `Searching ${mode.toUpperCase()}... Found ${totalFound}/30 (Scanning Rank ${currentIdx+50}+)`;
                 try {
                     const response = await fetch(`/api/scan?start=${currentIdx}&end=${currentIdx + 30}&mode=${mode}`);
                     const data = await response.json();
@@ -95,7 +96,7 @@
                     progress.style.width = (totalFound / 30 * 100) + "%";
                 } catch (e) { break; }
             }
-            status.innerText = `Search Finished. Found ${totalFound} signals.`;
+            status.innerText = `Scan Complete. Found ${totalFound} signals.`;
         }
 
         async function manualScan() {
@@ -113,18 +114,26 @@
                 div.className = 'card';
                 div.onclick = () => loadChart(coin.symbol, div);
                 div.innerHTML = `
-                    <div style="display:flex; justify-content:space-between; font-weight:800; font-size:15px">
+                    <div style="display:flex; justify-content:space-between; font-weight:800; font-size:16px; margin-bottom:10px">
                         <span>${coin.symbol}/USDT</span>
                         <span>$${coin.price}</span>
                     </div>
+
+                    <div class="metrics-row">
+                        <span>Volatility: <b>${coin.volatility}</b></span>
+                        <span>Money Flow: <b>${coin.adScore}</b></span>
+                    </div>
+
                     <span class="badge" style="background:${coin.color}; color:#000">${coin.status}</span>
+                    
                     <div class="plan-grid">
                         <div class="plan-item">Entry<b>${coin.plan.entry}</b></div>
                         <div class="plan-item sl">Stop Loss<b>${coin.plan.stop}</b></div>
                         <div class="plan-item tp">Target 1<b>${coin.plan.tp1}</b></div>
                         <div class="plan-item tp">Target 2<b>${coin.plan.tp2}</b></div>
                     </div>
-                    <div style="font-size:12px; line-height:1.4; margin-top:12px; color:var(--text-main); font-style:italic">
+                    
+                    <div style="font-size:12px; line-height:1.5; margin-top:12px; color:var(--text-main); font-style:italic">
                         <b>Conclusion:</b> ${coin.explanation}
                     </div>
                 `;

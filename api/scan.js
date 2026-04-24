@@ -8,9 +8,12 @@ export default async function handler(req, res) {
             .filter(s => s.quoteCoin === 'USDT' && s.state === 0)
             .map(s => s.symbol);
 
+        // Define the search zone (Starting from rank 50)
+        const gemZone = allSymbols.slice(50, 800);
+
         let targetSymbols = manualSymbol 
             ? [(manualSymbol.toUpperCase().endsWith('_USDT') ? manualSymbol.toUpperCase() : manualSymbol.toUpperCase() + '_USDT')]
-            : allSymbols.slice(parseInt(start), parseInt(end));
+            : gemZone.slice(parseInt(start), parseInt(end));
 
         const results = [];
 
@@ -40,7 +43,6 @@ export default async function handler(req, res) {
                 let color = "#888";
                 let explanation = "No clear footprint.";
 
-                // Filter logic based on Mode
                 const isAcc = (isFlat && adTrend > 0);
                 const isDist = (isFlat && adTrend < 0);
                 const isSpike = (volCurrent > volAvg * 1.5);
@@ -48,18 +50,17 @@ export default async function handler(req, res) {
                 if (isAcc) {
                     status = "💎 ACCUMULATION";
                     color = "#10b981";
-                    explanation = "Whales are capping price while filling bags. Bullish.";
+                    explanation = volatility < 0.025 ? "ULTRA-TIGHT SQUEEZE. Massive breakout potential." : "Steady whale absorption detected.";
                 } else if (isDist) {
                     status = "⚠️ DISTRIBUTION";
                     color = "#ef4444";
-                    explanation = "Whales exiting into retail bids. Bearish.";
+                    explanation = "Whales offloading into retail bids. Bull trap likely.";
                 } else if (isSpike) {
                     status = "🔥 VOLUME SPIKE";
                     color = "#f59e0b";
-                    explanation = "High activity. Momentum shift detected.";
+                    explanation = "High activity. Momentum is shifting rapidly.";
                 }
 
-                // Filter results by mode
                 const matchesMode = (mode === 'acc' && isAcc) || (mode === 'dist' && isDist) || (!mode);
 
                 if (manualSymbol || (status !== "NEUTRAL" && matchesMode)) {
