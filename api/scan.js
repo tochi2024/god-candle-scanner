@@ -3,17 +3,28 @@ const axios = require('axios');
 export default async function handler(req, res) {
     try {
         const { symbol: manualSymbol, start = 0, end = 50 } = req.query;
+        
+        // 1. Get all MEXC Futures symbols
         const exchangeRes = await axios.get('https://contract.mexc.com/api/v1/contract/detail');
         const allSymbols = exchangeRes.data.data
             .filter(s => s.quoteCoin === 'USDT' && s.state === 0)
             .map(s => s.symbol);
 
-        let targetSymbols = manualSymbol 
-            ? [(manualSymbol.toUpperCase().endsWith('_USDT') ? manualSymbol.toUpperCase() : manualSymbol.toUpperCase() + '_USDT')]
-            : allSymbols.slice(parseInt(start), parseInt(end));
+        // 2. DEFINE THE GEM ZONE (Skip top 50, take next 350)
+        const gemZoneSymbols = allSymbols.slice(50, 400);
+
+        let targetSymbols = [];
+        if (manualSymbol) {
+            const formatted = manualSymbol.toUpperCase().endsWith('_USDT') ? manualSymbol.toUpperCase() : manualSymbol.toUpperCase() + '_USDT';
+            targetSymbols = [formatted];
+        } else {
+            // Take the specific chunk requested by the frontend from the Gem Zone
+            targetSymbols = gemZoneSymbols.slice(parseInt(start), parseInt(end));
+        }
 
         const results = [];
 
+        // 3. Parallel scan for speed
         await Promise.all(targetSymbols.map(async (symbol) => {
             try {
                 const klineRes = await axios.get(`https://contract.mexc.com/api/v1/contract/kline/${symbol}?interval=Day1`, { timeout: 5000 });
