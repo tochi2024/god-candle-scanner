@@ -8,9 +8,7 @@ export default async function handler(req, res) {
             .filter(s => s.quoteCoin === 'USDT' && s.state === 0)
             .map(s => s.symbol);
 
-        // Define the search zone (Starting from rank 50)
         const gemZone = allSymbols.slice(50, 800);
-
         let targetSymbols = manualSymbol 
             ? [(manualSymbol.toUpperCase().endsWith('_USDT') ? manualSymbol.toUpperCase() : manualSymbol.toUpperCase() + '_USDT')]
             : gemZone.slice(parseInt(start), parseInt(end));
@@ -35,31 +33,29 @@ export default async function handler(req, res) {
                     adTrend += mfMultiplier * k.vol[i];
                 }
 
-                const isFlat = volatility < 0.045;
                 const volAvg = k.vol.reduce((a, b) => a + b) / 30;
                 const volCurrent = k.vol[k.vol.length - 1];
 
-                let status = "NEUTRAL";
-                let color = "#888";
-                let explanation = "No clear footprint.";
+                // SIGNAL STRENGTH ENGINE (0-100)
+                let strength = 0;
+                // 1. Volatility Weight (Tightness - 40pts)
+                strength += Math.max(0, 40 - (volatility * 800)); 
+                // 2. Money Flow Weight (Conviction - 40pts)
+                strength += Math.min(40, (Math.abs(adTrend) / (volAvg || 1)) * 5);
+                // 3. Volume Weight (Momentum - 20pts)
+                strength += Math.min(20, (volCurrent / volAvg) * 5);
+                
+                const finalStrength = Math.round(Math.min(100, strength));
 
+                const isFlat = volatility < 0.045;
                 const isAcc = (isFlat && adTrend > 0);
                 const isDist = (isFlat && adTrend < 0);
                 const isSpike = (volCurrent > volAvg * 1.5);
 
-                if (isAcc) {
-                    status = "💎 ACCUMULATION";
-                    color = "#10b981";
-                    explanation = volatility < 0.025 ? "ULTRA-TIGHT SQUEEZE. Massive breakout potential." : "Steady whale absorption detected.";
-                } else if (isDist) {
-                    status = "⚠️ DISTRIBUTION";
-                    color = "#ef4444";
-                    explanation = "Whales offloading into retail bids. Bull trap likely.";
-                } else if (isSpike) {
-                    status = "🔥 VOLUME SPIKE";
-                    color = "#f59e0b";
-                    explanation = "High activity. Momentum is shifting rapidly.";
-                }
+                let status = "NEUTRAL", color = "#888", explanation = "No clear footprint.";
+                if (isAcc) { status = "💎 ACCUMULATION"; color = "#10b981"; explanation = "Whale absorption. High probability breakout."; }
+                else if (isDist) { status = "⚠️ DISTRIBUTION"; color = "#ef4444"; explanation = "Whale offloading. High probability breakdown."; }
+                else if (isSpike) { status = "🔥 VOLUME SPIKE"; color = "#f59e0b"; explanation = "Massive momentum surge."; }
 
                 const matchesMode = (mode === 'acc' && isAcc) || (mode === 'dist' && isDist) || (!mode);
 
@@ -73,7 +69,7 @@ export default async function handler(req, res) {
                         symbol: symbol.replace('_USDT', ''),
                         volatility: (volatility * 100).toFixed(2) + "%",
                         status, color, price: currentPrice, adScore: Math.round(adTrend),
-                        explanation,
+                        explanation, strength: finalStrength,
                         plan: { entry: currentPrice.toFixed(4), stop: stopLoss.toFixed(4), tp1: tp1.toFixed(4), tp2: tp2.toFixed(4) }
                     });
                 }

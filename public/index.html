@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Whale Intel Pro | Ultimate Terminal</title>
+    <title>Whale Intel Pro | Strength Scanner</title>
     <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
     <style>
         :root {
@@ -20,12 +20,12 @@
         body { background: var(--bg-main); color: var(--text-main); font-family: 'Inter', sans-serif; margin: 0; display: flex; height: 100vh; overflow: hidden; }
         #sidebar { width: 380px; border-right: 1px solid var(--border); padding: 20px; display: flex; flex-direction: column; background: var(--bg-sidebar); overflow-y: auto; }
         #main-view { flex-grow: 1; background: #000; position: relative; }
-        h1 { font-size: 1.1rem; font-weight: 900; color: var(--accent); margin: 0 0 15px 0; text-transform: uppercase; letter-spacing: 1px; }
+        h1 { font-size: 1.1rem; font-weight: 900; color: var(--accent); margin: 0 0 15px 0; text-transform: uppercase; }
         
         .controls { background: var(--bg-card); padding: 15px; border-radius: 12px; border: 1px solid var(--border); margin-bottom: 15px; }
         .row { display: flex; gap: 8px; margin-bottom: 10px; }
         input { background: transparent; border: 1px solid var(--border); color: var(--text-main); padding: 10px; border-radius: 8px; flex-grow: 1; }
-        button { border: none; padding: 10px; font-weight: 700; border-radius: 8px; cursor: pointer; font-size: 11px; width: 100%; text-transform: uppercase; }
+        button { border: none; padding: 10px; font-weight: 700; border-radius: 8px; cursor: pointer; font-size: 11px; width: 100%; }
         .btn-acc { background: var(--accent); color: #000; }
         .btn-dist { background: var(--danger); color: #fff; }
         .btn-search { background: var(--text-main); color: var(--bg-main); width: auto; }
@@ -34,14 +34,17 @@
         .card:hover { border-color: var(--accent); transform: translateY(-2px); }
         .card.active { border-color: var(--accent); background: var(--bg-sidebar); border-width: 2px; }
         
-        .badge { font-size: 10px; font-weight: 900; padding: 4px 10px; border-radius: 6px; text-transform: uppercase; margin: 8px 0; display: inline-block; }
-        
-        .metrics-row { display: flex; gap: 15px; font-size: 12px; color: var(--text-muted); border-bottom: 1px solid var(--border); padding-bottom: 8px; margin-bottom: 8px; }
-        .metrics-row b { color: var(--text-main); }
+        /* Strength Meter Styles */
+        .strength-container { margin: 12px 0; }
+        .strength-label { font-size: 10px; font-weight: 800; display: flex; justify-content: space-between; margin-bottom: 4px; color: var(--text-muted); }
+        .strength-bar-bg { background: var(--border); height: 6px; border-radius: 3px; overflow: hidden; }
+        .strength-bar-fill { height: 100%; border-radius: 3px; transition: width 0.5s ease-out; }
 
+        .badge { font-size: 10px; font-weight: 900; padding: 4px 10px; border-radius: 6px; text-transform: uppercase; margin: 8px 0; display: inline-block; }
+        .metrics-row { display: flex; gap: 15px; font-size: 11px; color: var(--text-muted); margin-bottom: 10px; }
         .plan-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px; background: rgba(120,120,120,0.06); padding: 10px; border-radius: 8px; }
         .plan-item { font-size: 11px; color: var(--text-muted); }
-        .plan-item b { color: var(--text-main); display: block; font-size: 13px; margin-top: 2px; }
+        .plan-item b { color: var(--text-main); display: block; font-size: 13px; }
         .sl { border-left: 3px solid var(--danger); padding-left: 8px; }
         .tp { border-left: 3px solid var(--accent); padding-left: 8px; }
 
@@ -59,12 +62,12 @@
                 <button class="btn-search" onclick="manualScan()">GO</button>
             </div>
             <div class="row">
-                <button class="btn-acc" onclick="startFullScan('acc')">FIND ACCUMULATION</button>
-                <button class="btn-dist" onclick="startFullScan('dist')">FIND DISTRIBUTION</button>
+                <button class="btn-acc" onclick="startFullScan('acc')">ACCUMULATION</button>
+                <button class="btn-dist" onclick="startFullScan('dist')">DISTRIBUTION</button>
             </div>
         </div>
         <div id="progress-bar"></div>
-        <div id="status" style="font-size:11px; color:var(--text-muted); margin-bottom:15px">Select a mode to begin scanning.</div>
+        <div id="status" style="font-size:11px; color:var(--text-muted); margin-bottom:15px">Awaiting Scan...</div>
         <div id="results"></div>
     </div>
 
@@ -80,23 +83,22 @@
             const resDiv = document.getElementById('results');
             const progress = document.getElementById('progress-bar');
             const status = document.getElementById('status');
-            
             resDiv.innerHTML = ""; totalFound = 0;
             progress.style.width = "0%";
             progress.style.background = mode === 'acc' ? 'var(--accent)' : 'var(--danger)';
             
             let currentIdx = 0;
             while (totalFound < 30 && currentIdx < 800) {
-                status.innerText = `Searching ${mode.toUpperCase()}... Found ${totalFound}/30 (Scanning Rank ${currentIdx+50}+)`;
+                status.innerText = `Searching... Found ${totalFound}/30`;
                 try {
-                    const response = await fetch(`/api/scan?start=${currentIdx}&end=${currentIdx + 30}&mode=${mode}`);
+                    const response = await fetch(`/api/scan?start=${currentIdx}&end=${currentIdx + 40}&mode=${mode}`);
                     const data = await response.json();
                     if (data.length > 0) { renderResults(data); totalFound += data.length; }
-                    currentIdx += 30;
+                    currentIdx += 40;
                     progress.style.width = (totalFound / 30 * 100) + "%";
                 } catch (e) { break; }
             }
-            status.innerText = `Scan Complete. Found ${totalFound} signals.`;
+            status.innerText = "Scan Complete.";
         }
 
         async function manualScan() {
@@ -109,32 +111,46 @@
 
         function renderResults(data, prepend = false) {
             const resDiv = document.getElementById('results');
+            // Sort by strength so strongest signals appear first
+            data.sort((a,b) => b.strength - a.strength);
+
             data.forEach(coin => {
                 const div = document.createElement('div');
                 div.className = 'card';
                 div.onclick = () => loadChart(coin.symbol, div);
+                
+                // Color for the strength bar
+                let sColor = '#ff4444'; // Weak
+                if(coin.strength > 40) sColor = '#ffaa00'; // Medium
+                if(coin.strength > 75) sColor = '#00ff88'; // Strong
+
                 div.innerHTML = `
-                    <div style="display:flex; justify-content:space-between; font-weight:800; font-size:16px; margin-bottom:10px">
-                        <span>${coin.symbol}/USDT</span>
+                    <div style="display:flex; justify-content:space-between; font-weight:800; font-size:16px">
+                        <span>${coin.symbol}</span>
                         <span>$${coin.price}</span>
                     </div>
 
-                    <div class="metrics-row">
-                        <span>Volatility: <b>${coin.volatility}</b></span>
-                        <span>Money Flow: <b>${coin.adScore}</b></span>
+                    <div class="strength-container">
+                        <div class="strength-label">
+                            SIGNAL STRENGTH <span>${coin.strength}%</span>
+                        </div>
+                        <div class="strength-bar-bg">
+                            <div class="strength-bar-fill" style="width:${coin.strength}%; background:${sColor}"></div>
+                        </div>
                     </div>
 
                     <span class="badge" style="background:${coin.color}; color:#000">${coin.status}</span>
                     
+                    <div class="metrics-row">
+                        <span>Vol: <b>${coin.volatility}</b></span>
+                        <span>MF: <b>${coin.adScore}</b></span>
+                    </div>
+
                     <div class="plan-grid">
                         <div class="plan-item">Entry<b>${coin.plan.entry}</b></div>
                         <div class="plan-item sl">Stop Loss<b>${coin.plan.stop}</b></div>
                         <div class="plan-item tp">Target 1<b>${coin.plan.tp1}</b></div>
                         <div class="plan-item tp">Target 2<b>${coin.plan.tp2}</b></div>
-                    </div>
-                    
-                    <div style="font-size:12px; line-height:1.5; margin-top:12px; color:var(--text-main); font-style:italic">
-                        <b>Conclusion:</b> ${coin.explanation}
                     </div>
                 `;
                 if(prepend) resDiv.prepend(div); else resDiv.appendChild(div);
