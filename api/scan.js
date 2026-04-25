@@ -2,14 +2,14 @@ const axios = require('axios');
 
 export default async function handler(req, res) {
     try {
-        const { symbol: manualSymbol, mode, start = 0, end = 40 } = req.query;
+        const { symbol: manualSymbol, mode, start = 0, end = 50 } = req.query;
         const exchangeRes = await axios.get('https://contract.mexc.com/api/v1/contract/detail');
         const allSymbols = exchangeRes.data.data
             .filter(s => s.quoteCoin === 'USDT' && s.state === 0)
             .map(s => s.symbol);
 
-        // Extended Gem Zone to 1500 to ensure we can find 50 results
-        const gemZone = allSymbols.slice(50, 1500);
+        // Gem Zone: 50 to 1550 to ensure we find enough results
+        const gemZone = allSymbols.slice(50, 1550);
         let targetSymbols = manualSymbol 
             ? [(manualSymbol.toUpperCase().endsWith('_USDT') ? manualSymbol.toUpperCase() : manualSymbol.toUpperCase() + '_USDT')]
             : gemZone.slice(parseInt(start), parseInt(end));
@@ -23,32 +23,6 @@ export default async function handler(req, res) {
                 if (!k || k.time.length < 8) return;
 
                 const currentPrice = k.close[k.close.length - 1];
-
-                // --- PUMP HUNT LOGIC (STRICT 50%+) ---
-                if (mode === 'pump') {
-                    const last7Highs = k.high.slice(-7);
-                    const startPrice = k.open[k.open.length - 7]; 
-                    const peakPrice = Math.max(...last7Highs);
-                    const increasePct = ((peakPrice - startPrice) / startPrice) * 100;
-
-                    if (increasePct >= 50) {
-                        const peakIdx = last7Highs.lastIndexOf(peakPrice);
-                        const peakTs = k.time[k.time.length - 7 + peakIdx] * 1000;
-
-                        results.push({
-                            symbol: symbol.replace('_USDT', ''),
-                            status: "🔥 50%+ PUMP DETECTED",
-                            color: "#d400ff",
-                            price: currentPrice,
-                            increase: increasePct.toFixed(2) + "%",
-                            peakTime: new Date(peakTs).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit' }),
-                            explanation: `Strong Momentum: This token surged ${increasePct.toFixed(0)}% from its 7-day low.`
-                        });
-                    }
-                    return; 
-                }
-
-                // --- REGULAR ACC/DIST LOGIC ---
                 const last30Closes = k.close.slice(-30);
                 const avgPrice = last30Closes.reduce((a, b) => a + b) / 30;
                 const variance = last30Closes.reduce((a, b) => a + Math.pow(b - avgPrice, 2), 0) / 30;
@@ -62,26 +36,41 @@ export default async function handler(req, res) {
 
                 const volAvg = k.vol.reduce((a, b) => a + b) / 30;
                 const volCurrent = k.vol[k.vol.length - 1];
-
-                let strength = 0;
-                strength += Math.max(0, 40 - (volatility * 800)); 
-                strength += Math.min(40, (Math.abs(adTrend) / (volAvg || 1)) * 5);
-                strength += Math.min(20, (volCurrent / volAvg) * 5);
-                const finalStrength = Math.round(Math.min(100, strength));
-
                 const isFlat = volatility < 0.045;
+                const volSpike = volCurrent > volAvg * 1.5;
+
+                // Mode Determination
                 const isAcc = (isFlat && adTrend > 0);
                 const isDist = (isFlat && adTrend < 0);
-                const isSpike = (volCurrent > volAvg * 1.5);
+                
+                // Pump Logic (50%+)
+                const last7Highs = k.high.slice(-7);
+                const startPrice = k.open[k.open.length - 7]; 
+                const peakPrice = Math.max(...last7Highs);
+                const increasePct = ((peakPrice - startPrice) / startPrice) * 100;
+                const isPump = increasePct >= 50;
 
-                let status = "NEUTRAL", color = "#888";
-                if (isAcc) { status = "💎 ACCUMULATION"; color = "#10b981"; }
-                else if (isDist) { status = "⚠️ DISTRIBUTION"; color = "#ef4444"; }
-                else if (isSpike) { status = "🔥 VOLUME SPIKE"; color = "#f59e0b"; }
+                let status = "NEUTRAL", color = "#888", explanation = "No clear whale footprint.";
+                if (isAcc) { status = "💎 ACCUMULATION"; color = "#10b981"; explanation = "Whale absorption. Breakout likely."; }
+                else if (isDist) { status = "⚠️ DISTRIBUTION"; color = "#ef4444"; explanation = "Whale offloading. Trap likely."; }
+                else if (volSpike) { status = "🔥 VOLUME SPIKE"; color = "#f59e0b"; explanation = "Sudden momentum surge."; }
+                
+                // Override for Pump Mode
+                if (mode === 'pump' && isPump) {
+                    status = "🚀 50%+ PUMP";
+                    color = "#d400ff";
+                }
 
-                const matchesMode = (mode === 'acc' && isAcc) || (mode === 'dist' && isDist) || (!mode);
+                const matchesMode = (mode === 'acc' && isAcc) || (mode === 'dist' && isDist) || (mode === 'pump' && isPump) || (!mode);
 
                 if (manualSymbol || (status !== "NEUTRAL" && matchesMode)) {
+                    // Strength Calculation
+                    let strength = 0;
+                    strength += Math.max(0, 40 - (volatility * 800)); 
+                    strength += Math.min(40, (Math.abs(adTrend) / (volAvg || 1)) * 5);
+                    strength += Math.min(20, (volCurrent / volAvg) * 5);
+
+                    // Plan Math
                     const riskBuffer = volatility * 1.5;
                     const stopLoss = status === "⚠️ DISTRIBUTION" ? currentPrice * (1 + riskBuffer) : currentPrice * (1 - riskBuffer);
                     const tp1 = status === "⚠️ DISTRIBUTION" ? currentPrice * (1 - riskBuffer * 2) : currentPrice * (1 + riskBuffer * 2);
@@ -91,7 +80,8 @@ export default async function handler(req, res) {
                         symbol: symbol.replace('_USDT', ''),
                         volatility: (volatility * 100).toFixed(2) + "%",
                         status, color, price: currentPrice, adScore: Math.round(adTrend),
-                        strength: finalStrength,
+                        explanation, strength: Math.round(Math.min(100, strength)),
+                        pumpData: isPump ? { increase: increasePct.toFixed(2) + "%", time: new Date(k.time[k.time.length - 7 + last7Highs.lastIndexOf(peakPrice)] * 1000).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit' }) } : null,
                         plan: { entry: currentPrice.toFixed(4), stop: stopLoss.toFixed(4), tp1: tp1.toFixed(4), tp2: tp2.toFixed(4) }
                     });
                 }
