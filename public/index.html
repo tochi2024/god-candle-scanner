@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Whale Intel Pro | Pump Hunter</title>
+    <title>Whale Intel Pro | 50-Signal Scanner</title>
     <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
     <style>
         :root {
@@ -34,15 +34,12 @@
         .card:hover { border-color: var(--accent); transform: translateY(-2px); }
         .card.active { border-color: var(--accent); background: var(--bg-sidebar); border-width: 2px; }
         
-        .pump-report { margin-top: 12px; border: 1px solid var(--pump); border-radius: 8px; padding: 10px; background: rgba(212,0,255,0.05); }
-        .pump-val { color: var(--pump); font-weight: 800; font-size: 14px; display: block; margin-bottom: 4px; }
-        .pump-time { font-size: 11px; color: var(--text-muted); }
-
         .strength-container { margin: 12px 0; }
         .strength-label { font-size: 10px; font-weight: 800; display: flex; justify-content: space-between; margin-bottom: 4px; color: var(--text-muted); }
         .strength-bar-bg { background: var(--border); height: 6px; border-radius: 3px; overflow: hidden; }
         .strength-bar-fill { height: 100%; border-radius: 3px; transition: width 0.5s ease-out; }
 
+        .pump-report { margin-top: 12px; border: 1px solid var(--pump); border-radius: 8px; padding: 10px; background: rgba(212,0,255,0.05); }
         .badge { font-size: 10px; font-weight: 900; padding: 4px 10px; border-radius: 6px; text-transform: uppercase; margin: 8px 0; display: inline-block; }
         .plan-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px; background: rgba(120,120,120,0.06); padding: 10px; border-radius: 8px; }
         .plan-item { font-size: 11px; color: var(--text-muted); }
@@ -55,7 +52,7 @@
 <body>
 
     <div id="sidebar">
-        <h1>Whale Intelligence</h1>
+        <h1>Whale Intel Pro</h1>
         <div class="controls">
             <div class="row">
                 <input type="text" id="symbolInput" placeholder="Symbol (RAVE)">
@@ -65,10 +62,10 @@
                 <button class="btn-acc" onclick="startFullScan('acc')">ACCUMULATION</button>
                 <button class="btn-dist" onclick="startFullScan('dist')">DISTRIBUTION</button>
             </div>
-            <button class="btn-pump" onclick="startFullScan('pump')">HUNT 50%+ PUMPS (7D)</button>
+            <button class="btn-pump" onclick="startFullScan('pump')">HUNT 50 RESULTS (50%+ PUMPS)</button>
         </div>
         <div id="progress-bar"></div>
-        <div id="status" style="font-size:11px; color:var(--text-muted); margin-bottom:15px">Select a mode.</div>
+        <div id="status" style="font-size:11px; color:var(--text-muted); margin-bottom:15px">Awaiting Scan...</div>
         <div id="results"></div>
     </div>
 
@@ -89,17 +86,19 @@
             progress.style.background = mode === 'pump' ? 'var(--pump)' : (mode === 'acc' ? 'var(--accent)' : 'var(--danger)');
             
             let currentIdx = 0;
-            while (totalFound < 30 && currentIdx < 800) {
-                status.innerText = `Searching... Found ${totalFound}/30`;
+            // Loop until we find 50 results or reach rank 1500
+            while (totalFound < 50 && currentIdx < 1450) {
+                status.innerText = `Searching... Found ${totalFound}/50`;
                 try {
                     const response = await fetch(`/api/scan?start=${currentIdx}&end=${currentIdx + 40}&mode=${mode}`);
                     const data = await response.json();
                     if (data.length > 0) { renderResults(data); totalFound += data.length; }
                     currentIdx += 40;
-                    progress.style.width = (totalFound / 30 * 100) + "%";
+                    // Progress bar shows progress toward 50 signals
+                    progress.style.width = Math.min(100, (totalFound / 50 * 100)) + "%";
                 } catch (e) { break; }
             }
-            status.innerText = "Scan Complete.";
+            status.innerText = "Target Reached: 50 Signals Found.";
         }
 
         async function manualScan() {
@@ -128,8 +127,8 @@
                     cardBody += `
                         <span class="badge" style="background:var(--pump); color:#fff">${coin.status}</span>
                         <div class="pump-report">
-                            <span class="pump-val">📈 INCREASE: ${coin.increase}</span>
-                            <span class="pump-time">🕒 PEAK REACHED: ${coin.peakTime}</span>
+                            <span style="color:var(--pump); font-weight:800; font-size:14px">📈 INCREASE: ${coin.increase}</span><br>
+                            <span style="font-size:11px; color:var(--text-muted)">🕒 PEAK: ${coin.peakTime}</span>
                         </div>
                     `;
                 } else {
@@ -149,7 +148,7 @@
                     `;
                 }
 
-                div.innerHTML = cardBody + `<div style="font-size:11px; margin-top:12px; color:var(--text-muted); font-style:italic"><b>Conclusion:</b> ${coin.explanation}</div>`;
+                div.innerHTML = cardBody;
                 if(prepend) resDiv.prepend(div); else resDiv.appendChild(div);
             });
         }

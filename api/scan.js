@@ -8,7 +8,8 @@ export default async function handler(req, res) {
             .filter(s => s.quoteCoin === 'USDT' && s.state === 0)
             .map(s => s.symbol);
 
-        const gemZone = allSymbols.slice(50, 800);
+        // Extended Gem Zone to 1500 to ensure we can find 50 results
+        const gemZone = allSymbols.slice(50, 1500);
         let targetSymbols = manualSymbol 
             ? [(manualSymbol.toUpperCase().endsWith('_USDT') ? manualSymbol.toUpperCase() : manualSymbol.toUpperCase() + '_USDT')]
             : gemZone.slice(parseInt(start), parseInt(end));
@@ -28,10 +29,9 @@ export default async function handler(req, res) {
                     const last7Highs = k.high.slice(-7);
                     const startPrice = k.open[k.open.length - 7]; 
                     const peakPrice = Math.max(...last7Highs);
-                    
                     const increasePct = ((peakPrice - startPrice) / startPrice) * 100;
 
-                    if (increasePct >= 50) { // CHANGED TO 50
+                    if (increasePct >= 50) {
                         const peakIdx = last7Highs.lastIndexOf(peakPrice);
                         const peakTs = k.time[k.time.length - 7 + peakIdx] * 1000;
 
@@ -42,7 +42,7 @@ export default async function handler(req, res) {
                             price: currentPrice,
                             increase: increasePct.toFixed(2) + "%",
                             peakTime: new Date(peakTs).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit' }),
-                            explanation: `Strong Momentum: This token surged ${increasePct.toFixed(0)}% from its 7-day low. Peak hit on ${new Date(peakTs).toLocaleDateString()}.`
+                            explanation: `Strong Momentum: This token surged ${increasePct.toFixed(0)}% from its 7-day low.`
                         });
                     }
                     return; 
@@ -74,10 +74,10 @@ export default async function handler(req, res) {
                 const isDist = (isFlat && adTrend < 0);
                 const isSpike = (volCurrent > volAvg * 1.5);
 
-                let status = "NEUTRAL", color = "#888", explanation = "No clear footprint.";
-                if (isAcc) { status = "💎 ACCUMULATION"; color = "#10b981"; explanation = "Whale absorption. High probability breakout."; }
-                else if (isDist) { status = "⚠️ DISTRIBUTION"; color = "#ef4444"; explanation = "Whale offloading. High probability breakdown."; }
-                else if (isSpike) { status = "🔥 VOLUME SPIKE"; color = "#f59e0b"; explanation = "Massive momentum surge."; }
+                let status = "NEUTRAL", color = "#888";
+                if (isAcc) { status = "💎 ACCUMULATION"; color = "#10b981"; }
+                else if (isDist) { status = "⚠️ DISTRIBUTION"; color = "#ef4444"; }
+                else if (isSpike) { status = "🔥 VOLUME SPIKE"; color = "#f59e0b"; }
 
                 const matchesMode = (mode === 'acc' && isAcc) || (mode === 'dist' && isDist) || (!mode);
 
@@ -91,7 +91,7 @@ export default async function handler(req, res) {
                         symbol: symbol.replace('_USDT', ''),
                         volatility: (volatility * 100).toFixed(2) + "%",
                         status, color, price: currentPrice, adScore: Math.round(adTrend),
-                        explanation, strength: finalStrength,
+                        strength: finalStrength,
                         plan: { entry: currentPrice.toFixed(4), stop: stopLoss.toFixed(4), tp1: tp1.toFixed(4), tp2: tp2.toFixed(4) }
                     });
                 }
