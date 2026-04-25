@@ -5,7 +5,7 @@ export default async function handler(req, res) {
         const { symbol: manualSymbol, mode, start = 0, end = 40 } = req.query;
         const exchangeRes = await axios.get('https://contract.mexc.com/api/v1/contract/detail');
         const allSymbols = exchangeRes.data.data
-            .filter(s => s.quoteCoin === 'USDT' && s.status === 'Trading' || s.state === 0)
+            .filter(s => s.quoteCoin === 'USDT' && s.state === 0)
             .map(s => s.symbol);
 
         const gemZone = allSymbols.slice(50, 800);
@@ -23,32 +23,32 @@ export default async function handler(req, res) {
 
                 const currentPrice = k.close[k.close.length - 1];
 
-                // --- PUMP HUNT LOGIC (STRICT 80%+) ---
+                // --- PUMP HUNT LOGIC (STRICT 50%+) ---
                 if (mode === 'pump') {
                     const last7Highs = k.high.slice(-7);
-                    const startPrice = k.open[k.open.length - 7]; // Price at start of 7-day window
+                    const startPrice = k.open[k.open.length - 7]; 
                     const peakPrice = Math.max(...last7Highs);
                     
                     const increasePct = ((peakPrice - startPrice) / startPrice) * 100;
 
-                    if (increasePct >= 80) {
+                    if (increasePct >= 50) { // CHANGED TO 50
                         const peakIdx = last7Highs.lastIndexOf(peakPrice);
                         const peakTs = k.time[k.time.length - 7 + peakIdx] * 1000;
 
                         results.push({
                             symbol: symbol.replace('_USDT', ''),
-                            status: "🔥 80%+ PUMP DETECTED",
+                            status: "🔥 50%+ PUMP DETECTED",
                             color: "#d400ff",
                             price: currentPrice,
                             increase: increasePct.toFixed(2) + "%",
                             peakTime: new Date(peakTs).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit' }),
-                            explanation: `Extreme Momentum: This token surged ${increasePct.toFixed(0)}% from its 7-day low. Peak hit on ${new Date(peakTs).toLocaleDateString()}.`
+                            explanation: `Strong Momentum: This token surged ${increasePct.toFixed(0)}% from its 7-day low. Peak hit on ${new Date(peakTs).toLocaleDateString()}.`
                         });
                     }
                     return; 
                 }
 
-                // --- ACC/DIST/STRENGTH LOGIC ---
+                // --- REGULAR ACC/DIST LOGIC ---
                 const last30Closes = k.close.slice(-30);
                 const avgPrice = last30Closes.reduce((a, b) => a + b) / 30;
                 const variance = last30Closes.reduce((a, b) => a + Math.pow(b - avgPrice, 2), 0) / 30;
