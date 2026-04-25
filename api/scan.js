@@ -2,10 +2,10 @@ const axios = require('axios');
 
 export default async function handler(req, res) {
     try {
-        const { symbol: manualSymbol, mode, start = 0, end = 50 } = req.query;
+        const { symbol: manualSymbol, mode, start = 0, end = 40 } = req.query;
         const exchangeRes = await axios.get('https://contract.mexc.com/api/v1/contract/detail');
         const allSymbols = exchangeRes.data.data
-            .filter(s => s.quoteCoin === 'USDT' && s.state === 0)
+            .filter(s => s.quoteCoin === 'USDT' && s.status === 'Trading' || s.state === 0)
             .map(s => s.symbol);
 
         const gemZone = allSymbols.slice(50, 800);
@@ -17,12 +17,39 @@ export default async function handler(req, res) {
 
         await Promise.all(targetSymbols.map(async (symbol) => {
             try {
-                const klineRes = await axios.get(`https://contract.mexc.com/api/v1/contract/kline/${symbol}?interval=Day1`, { timeout: 5000 });
+                const klineRes = await axios.get(`https://contract.mexc.com/api/v1/contract/kline/${symbol}?interval=Day1&limit=30`, { timeout: 6000 });
                 const k = klineRes.data.data;
-                if (!k || k.time.length < 30) return;
+                if (!k || k.time.length < 8) return;
 
-                const last30Closes = k.close.slice(-30);
                 const currentPrice = k.close[k.close.length - 1];
+
+                // --- PUMP HUNT LOGIC (STRICT 80%+) ---
+                if (mode === 'pump') {
+                    const last7Highs = k.high.slice(-7);
+                    const startPrice = k.open[k.open.length - 7]; // Price at start of 7-day window
+                    const peakPrice = Math.max(...last7Highs);
+                    
+                    const increasePct = ((peakPrice - startPrice) / startPrice) * 100;
+
+                    if (increasePct >= 80) {
+                        const peakIdx = last7Highs.lastIndexOf(peakPrice);
+                        const peakTs = k.time[k.time.length - 7 + peakIdx] * 1000;
+
+                        results.push({
+                            symbol: symbol.replace('_USDT', ''),
+                            status: "🔥 80%+ PUMP DETECTED",
+                            color: "#d400ff",
+                            price: currentPrice,
+                            increase: increasePct.toFixed(2) + "%",
+                            peakTime: new Date(peakTs).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit' }),
+                            explanation: `Extreme Momentum: This token surged ${increasePct.toFixed(0)}% from its 7-day low. Peak hit on ${new Date(peakTs).toLocaleDateString()}.`
+                        });
+                    }
+                    return; 
+                }
+
+                // --- ACC/DIST/STRENGTH LOGIC ---
+                const last30Closes = k.close.slice(-30);
                 const avgPrice = last30Closes.reduce((a, b) => a + b) / 30;
                 const variance = last30Closes.reduce((a, b) => a + Math.pow(b - avgPrice, 2), 0) / 30;
                 const volatility = Math.sqrt(variance) / avgPrice;
@@ -36,15 +63,10 @@ export default async function handler(req, res) {
                 const volAvg = k.vol.reduce((a, b) => a + b) / 30;
                 const volCurrent = k.vol[k.vol.length - 1];
 
-                // SIGNAL STRENGTH ENGINE (0-100)
                 let strength = 0;
-                // 1. Volatility Weight (Tightness - 40pts)
                 strength += Math.max(0, 40 - (volatility * 800)); 
-                // 2. Money Flow Weight (Conviction - 40pts)
                 strength += Math.min(40, (Math.abs(adTrend) / (volAvg || 1)) * 5);
-                // 3. Volume Weight (Momentum - 20pts)
                 strength += Math.min(20, (volCurrent / volAvg) * 5);
-                
                 const finalStrength = Math.round(Math.min(100, strength));
 
                 const isFlat = volatility < 0.045;
