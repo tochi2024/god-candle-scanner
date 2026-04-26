@@ -25,76 +25,63 @@ export default async function handler(req, res) {
                 const volAvg = k.vol.reduce((a, b) => a + b) / 30;
                 const volCurrent = k.vol[k.vol.length - 1];
                 
-                // Money Flow Logic
+                const last30Closes = k.close.slice(-30);
+                const avgPrice = last30Closes.reduce((a, b) => a + b) / 30;
+                const variance = last30Closes.reduce((a, b) => a + Math.pow(b - avgPrice, 2), 0) / 30;
+                const volatility = Math.sqrt(variance) / avgPrice;
+
                 let adTrend = 0;
                 for (let i = k.time.length - 20; i < k.time.length; i++) {
                     const mfMultiplier = ((k.close[i] - k.low[i]) - (k.high[i] - k.close[i])) / (k.high[i] - k.low[i] || 0.0001);
                     adTrend += mfMultiplier * k.vol[i];
                 }
 
-                // 1. EXTREME ACTIVITY LOGIC (Vol > 2.5x Avg)
+                // MOVEMENT LOGIC
                 const isExtremeVol = volCurrent > (volAvg * 2.5);
-                if (mode === 'extreme') {
-                    if (isExtremeVol) {
-                        const side = adTrend > 0 ? "BUYING" : "SELLING";
-                        results.push({
-                            symbol: symbol.replace('_USDT', ''),
-                            status: `🚨 EXTREME ${side}`,
-                            color: adTrend > 0 ? "#00ff88" : "#ff4444",
-                            price: currentPrice,
-                            volPower: (volCurrent / volAvg).toFixed(1) + "x",
-                            explanation: `Whale Alert: Volume is ${ (volCurrent / volAvg).toFixed(1) }x higher than normal with heavy ${side.toLowerCase()} pressure.`,
-                            adScore: Math.round(adTrend)
-                        });
-                    }
-                    return;
-                }
-
-                // 2. PUMP LOGIC (20D High)
                 const last30Highs = k.high;
-                const globalMaxHigh = Math.max(...last30Highs);
-                const peakIndex = last30Highs.lastIndexOf(globalMaxHigh);
-                const daysAgo = k.time.length - 1 - peakIndex;
-                const increasePct = ((globalMaxHigh - Math.min(...k.low)) / Math.min(...k.low)) * 100;
+                const peakPrice = Math.max(...last30Highs);
+                const peakIdx = last30Highs.lastIndexOf(peakPrice);
+                const daysSincePeak = k.time.length - 1 - peakIdx;
+                const increaseMacro = ((peakPrice - Math.min(...k.low)) / Math.min(...k.low)) * 100;
 
-                if (mode === 'pump') {
-                    if (daysAgo <= 20 && increasePct >= 15) {
-                        results.push({
-                            symbol: symbol.replace('_USDT', ''),
-                            status: "🚀 NEW 20D HIGH",
-                            color: "#d400ff",
-                            price: currentPrice,
-                            increase: increasePct.toFixed(2) + "%",
-                            peakTime: new Date(k.time[peakIndex] * 1000).toLocaleString('en-US', { month: 'short', day: 'numeric' }),
-                            explanation: `Momentum: Hit a 20-day high ${daysAgo} days ago.`
-                        });
-                    }
-                    return;
+                const isFlat = volatility < 0.045;
+                const isAcc = (isFlat && adTrend > 0);
+                const isDist = (isFlat && adTrend < 0);
+                const isPump = (daysSincePeak <= 20 && increaseMacro >= 15);
+
+                let status = "NEUTRAL", color = "#888", explanation = "Standard market activity.";
+                
+                if (mode === 'extreme' && isExtremeVol) {
+                    status = adTrend > 0 ? "🚨 EXTREME BUYING" : "🚨 EXTREME SELLING";
+                    color = adTrend > 0 ? "#00ff88" : "#ff4444";
+                    explanation = `Whale alert: Volume is ${(volCurrent / volAvg).toFixed(1)}x higher than average.`;
+                } else if (mode === 'pump' && isPump) {
+                    status = "🚀 NEW 20D HIGH"; color = "#d400ff";
+                    explanation = `Momentum: Hit a 20-day high ${daysSincePeak} days ago.`;
+                } else if (isAcc) {
+                    status = "💎 ACCUMULATION"; color = "#10b981";
+                    explanation = "Whale absorption detected. Price is coiled.";
+                } else if (isDist) {
+                    status = "⚠️ DISTRIBUTION"; color = "#ef4444";
+                    explanation = "Whale exit detected. The base is likely a trap.";
                 }
 
-                // 3. REGULAR ACC/DIST LOGIC
-                const last30Closes = k.close.slice(-30);
-                const avgPrice = last30Closes.reduce((a, b) => a + b) / 30;
-                const variance = last30Closes.reduce((a, b) => a + Math.pow(b - avgPrice, 2), 0) / 30;
-                const volatility = Math.sqrt(variance) / avgPrice;
-                const isFlat = volatility < 0.045;
-
-                let status = "NEUTRAL", color = "#888";
-                if (isFlat && adTrend > 0) { status = "💎 ACCUMULATION"; color = "#10b981"; }
-                else if (isFlat && adTrend < 0) { status = "⚠️ DISTRIBUTION"; color = "#ef4444"; }
-                else if (volCurrent > volAvg * 1.5) { status = "🔥 VOLUME SPIKE"; color = "#f59e0b"; }
-
-                const matchesMode = (mode === 'acc' && status.includes("ACC")) || (mode === 'dist' && status.includes("DIST")) || (!mode);
+                const matchesMode = (mode === 'acc' && isAcc) || (mode === 'dist' && isDist) || (mode === 'pump' && isPump) || (mode === 'extreme' && isExtremeVol) || (!mode);
 
                 if (manualSymbol || (status !== "NEUTRAL" && matchesMode)) {
                     let strength = Math.round(Math.min(100, (40 - (volatility * 800)) + ((Math.abs(adTrend) / (volAvg || 1)) * 5) + ((volCurrent / volAvg) * 5)));
                     const riskBuffer = volatility * 1.5;
+
                     results.push({
                         symbol: symbol.replace('_USDT', ''),
                         volatility: (volatility * 100).toFixed(2) + "%",
                         status, color, price: currentPrice, adScore: Math.round(adTrend),
-                        strength: strength < 0 ? 10 : strength,
-                        explanation: status.includes("ACC") ? "Whale absorption. Breakout likely." : "Distribution phase. Trap likely.",
+                        strength: Math.max(10, strength),
+                        explanation,
+                        modeData: {
+                            isPump, increase: increaseMacro.toFixed(1) + "%", peakDay: new Date(k.time[peakIdx] * 1000).toLocaleString('en-US', { month: 'short', day: 'numeric' }),
+                            isExtreme: isExtremeVol, volPower: (volCurrent / volAvg).toFixed(1) + "x"
+                        },
                         plan: { 
                             entry: currentPrice.toFixed(4), 
                             stop: status.includes("DIST") ? (currentPrice * (1 + riskBuffer)).toFixed(4) : (currentPrice * (1 - riskBuffer)).toFixed(4),
