@@ -69,14 +69,21 @@ export default async function handler(req, res) {
                 const matchesMode = (mode === 'acc' && isAcc) || (mode === 'dist' && isDist) || (mode === 'pump' && isPump) || (mode === 'extreme' && isExtremeVol) || (!mode);
 
                 if (manualSymbol || (status !== "NEUTRAL" && matchesMode)) {
-                    let strength = Math.round(Math.min(100, (40 - (volatility * 800)) + ((Math.abs(adTrend) / (volAvg || 1)) * 5) + ((volCurrent / volAvg) * 5)));
+                    // --- STRENGTH ENGINE ---
+                    let strength = Math.round(
+                        (Math.max(0, 40 - (volatility * 800))) + // Compression (40pts)
+                        (Math.min(40, (Math.abs(adTrend) / (volAvg || 1)) * 5)) + // Conviction (40pts)
+                        (Math.min(20, (volCurrent / volAvg) * 5)) // Activity (20pts)
+                    );
+                    
+                    const finalStrength = Math.max(10, Math.min(100, strength));
                     const riskBuffer = volatility * 1.5;
 
                     results.push({
                         symbol: symbol.replace('_USDT', ''),
                         volatility: (volatility * 100).toFixed(2) + "%",
                         status, color, price: currentPrice, adScore: Math.round(adTrend),
-                        strength: Math.max(10, strength),
+                        strength: finalStrength,
                         explanation,
                         modeData: {
                             isPump, increase: increaseMacro.toFixed(1) + "%", peakDay: new Date(k.time[peakIdx] * 1000).toLocaleString('en-US', { month: 'short', day: 'numeric' }),

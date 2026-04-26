@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Whale Intel Pro | Ultimate Intelligence</title>
+    <title>Whale Intel Pro | Ultimate Terminal</title>
     <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
     <style>
         :root {
@@ -37,10 +37,14 @@
         
         .badge { font-size: 10px; font-weight: 900; padding: 4px 10px; border-radius: 6px; text-transform: uppercase; margin: 8px 0; display: inline-block; }
         
-        /* RESTORED METRICS DISPLAY */
         .metrics-row { display: flex; gap: 15px; font-size: 11px; color: var(--text-muted); border-bottom: 1px solid var(--border); padding-bottom: 8px; margin: 8px 0; }
         .metrics-row b { color: var(--text-main); }
-        .strength-bar-bg { background: var(--border); height: 4px; border-radius: 2px; overflow: hidden; margin: 6px 0; }
+
+        /* STRENGTH UI */
+        .strength-container { margin: 12px 0; }
+        .strength-text { font-size: 11px; font-weight: 800; color: var(--text-main); display: flex; justify-content: space-between; margin-bottom: 4px; }
+        .strength-bar-bg { background: var(--border); height: 6px; border-radius: 3px; overflow: hidden; }
+        .strength-bar-fill { height: 100%; transition: width 0.5s; }
 
         .extra-data { padding: 10px; border-radius: 8px; margin-top: 10px; font-size: 13px; font-weight: 800; border: 1px solid var(--border); }
         .plan-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; background: rgba(120,120,120,0.06); padding: 10px; border-radius: 8px; }
@@ -118,18 +122,22 @@
                 
                 let sColor = coin.strength > 75 ? '#00ff88' : (coin.strength > 40 ? '#ffaa00' : '#ff4444');
 
-                // MANDATORY HEADER AND METRICS
                 let html = `
                     <div style="display:flex; justify-content:space-between; font-weight:800; font-size:16px"><span>${coin.symbol}/USDT</span><span>$${coin.price}</span></div>
+                    
                     <div class="metrics-row">
                         <span>Vol: <b>${coin.volatility}</b></span>
                         <span>MF: <b>${coin.adScore}</b></span>
                     </div>
-                    <div class="strength-bar-bg"><div style="height:100%; width:${coin.strength}%; background:${sColor}"></div></div>
+
+                    <div class="strength-container">
+                        <div class="strength-text">SIGNAL STRENGTH <span>${coin.strength}%</span></div>
+                        <div class="strength-bar-bg"><div class="strength-bar-fill" style="width:${coin.strength}%; background:${sColor}"></div></div>
+                    </div>
+
                     <span class="badge" style="background:${coin.color}; color:${coin.color==='#ef4444'?'#fff':'#000'}">${coin.status}</span>
                 `;
 
-                // CONDITIONAL MODE DATA
                 if (coin.modeData.isExtreme) {
                     html += `<div class="extra-data" style="color:var(--extreme); border-color:var(--extreme)">🚨 SURGE: ${coin.modeData.volPower}</div>`;
                 } else if (coin.modeData.isPump) {
