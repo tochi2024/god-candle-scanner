@@ -36,64 +36,66 @@ export default async function handler(req, res) {
                     adTrend += mfMultiplier * k.vol[i];
                 }
 
-                // MOVEMENT LOGIC
-                const isExtremeVol = volCurrent > (volAvg * 2.5);
+                // MOVEMENT DATA
                 const last30Highs = k.high;
+                const last30Lows = k.low;
                 const peakPrice = Math.max(...last30Highs);
+                const floorPrice = Math.min(...last30Lows);
                 const peakIdx = last30Highs.lastIndexOf(peakPrice);
                 const daysSincePeak = k.time.length - 1 - peakIdx;
-                const increaseMacro = ((peakPrice - Math.min(...k.low)) / Math.min(...k.low)) * 100;
-
-                const isFlat = volatility < 0.045;
-                const isAcc = (isFlat && adTrend > 0);
-                const isDist = (isFlat && adTrend < 0);
-                const isPump = (daysSincePeak <= 20 && increaseMacro >= 15);
-
-                let status = "NEUTRAL", color = "#888", explanation = "Standard market activity.";
                 
-                if (mode === 'extreme' && isExtremeVol) {
+                const totalPumpSize = ((peakPrice - floorPrice) / floorPrice) * 100;
+                const dropFromPeak = ((peakPrice - currentPrice) / peakPrice) * 100;
+
+                // LOGIC FOR MODES
+                const isExtremeVol = volCurrent > (volAvg * 2.5);
+                const isPump = (daysSincePeak <= 20 && totalPumpSize >= 50); // Specifically 50%+
+                const isCorrection = (isPump && dropFromPeak >= 20); // Dropped at least 20% from peak
+
+                let status = "NEUTRAL", color = "#888", explanation = "No clear footprint.";
+                
+                if (mode === 'correction' && isCorrection) {
+                    const isShort = adTrend < 0;
+                    status = isShort ? "🚨 SHORT CANDIDATE" : "🍀 DIP BUY OPPORTUNITY";
+                    color = isShort ? "#ff4444" : "#00ff88";
+                    explanation = isShort ? "Structure failure. Whales are dumping into the drop. Target lower." : "Healthy retrace. Whales are absorbing the dip for leg 2.";
+                } else if (mode === 'extreme' && isExtremeVol) {
                     status = adTrend > 0 ? "🚨 EXTREME BUYING" : "🚨 EXTREME SELLING";
                     color = adTrend > 0 ? "#00ff88" : "#ff4444";
-                    explanation = `Whale alert: Volume is ${(volCurrent / volAvg).toFixed(1)}x higher than average.`;
-                } else if (mode === 'pump' && isPump) {
-                    status = "🚀 NEW 20D HIGH"; color = "#d400ff";
-                    explanation = `Momentum: Hit a 20-day high ${daysSincePeak} days ago.`;
-                } else if (isAcc) {
+                    explanation = `Vol Surge: ${(volCurrent/volAvg).toFixed(1)}x above average.`;
+                } else if (mode === 'pump' && daysSincePeak <= 20 && totalPumpSize >= 15) {
+                    status = "🚀 20D HIGH"; color = "#d400ff";
+                    explanation = `Momentum: Hit high ${daysSincePeak} days ago.`;
+                } else if (volatility < 0.045 && adTrend > 0) {
                     status = "💎 ACCUMULATION"; color = "#10b981";
-                    explanation = "Whale absorption detected. Price is coiled.";
-                } else if (isDist) {
+                    explanation = "Whale absorption. Coiled for breakout.";
+                } else if (volatility < 0.045 && adTrend < 0) {
                     status = "⚠️ DISTRIBUTION"; color = "#ef4444";
-                    explanation = "Whale exit detected. The base is likely a trap.";
+                    explanation = "Whale offloading. Fake base detected.";
                 }
 
-                const matchesMode = (mode === 'acc' && isAcc) || (mode === 'dist' && isDist) || (mode === 'pump' && isPump) || (mode === 'extreme' && isExtremeVol) || (!mode);
+                const matchesMode = (mode === 'correction' && isCorrection) || (mode === 'acc' && status.includes("ACC")) || (mode === 'dist' && status.includes("DIST")) || (mode === 'pump' && status.includes("20D")) || (mode === 'extreme' && isExtremeVol) || (!mode);
 
                 if (manualSymbol || (status !== "NEUTRAL" && matchesMode)) {
-                    // --- STRENGTH ENGINE ---
-                    let strength = Math.round(
-                        (Math.max(0, 40 - (volatility * 800))) + // Compression (40pts)
-                        (Math.min(40, (Math.abs(adTrend) / (volAvg || 1)) * 5)) + // Conviction (40pts)
-                        (Math.min(20, (volCurrent / volAvg) * 5)) // Activity (20pts)
-                    );
-                    
-                    const finalStrength = Math.max(10, Math.min(100, strength));
+                    let strength = Math.round((Math.max(0, 40 - (volatility * 800))) + (Math.min(40, (Math.abs(adTrend) / (volAvg || 1)) * 5)) + (Math.min(20, (volCurrent / volAvg) * 5)));
                     const riskBuffer = volatility * 1.5;
 
                     results.push({
                         symbol: symbol.replace('_USDT', ''),
                         volatility: (volatility * 100).toFixed(2) + "%",
                         status, color, price: currentPrice, adScore: Math.round(adTrend),
-                        strength: finalStrength,
+                        strength: Math.max(10, Math.min(100, strength)),
                         explanation,
                         modeData: {
-                            isPump, increase: increaseMacro.toFixed(1) + "%", peakDay: new Date(k.time[peakIdx] * 1000).toLocaleString('en-US', { month: 'short', day: 'numeric' }),
-                            isExtreme: isExtremeVol, volPower: (volCurrent / volAvg).toFixed(1) + "x"
+                            isCorrection, drop: dropFromPeak.toFixed(1) + "%", pump: totalPumpSize.toFixed(0) + "%",
+                            isExtreme: isExtremeVol, volPower: (volCurrent / volAvg).toFixed(1) + "x",
+                            isPump: (daysSincePeak <= 20 && totalPumpSize >= 15) && !isCorrection, peak: daysSincePeak
                         },
                         plan: { 
                             entry: currentPrice.toFixed(4), 
-                            stop: status.includes("DIST") ? (currentPrice * (1 + riskBuffer)).toFixed(4) : (currentPrice * (1 - riskBuffer)).toFixed(4),
-                            tp1: status.includes("DIST") ? (currentPrice * (1 - riskBuffer * 2)).toFixed(4) : (currentPrice * (1 + riskBuffer * 2)).toFixed(4),
-                            tp2: status.includes("DIST") ? (currentPrice * (1 - riskBuffer * 5)).toFixed(4) : (currentPrice * (1 + riskBuffer * 5)).toFixed(4)
+                            stop: (adTrend < 0) ? (currentPrice * (1 + riskBuffer)).toFixed(4) : (currentPrice * (1 - riskBuffer)).toFixed(4),
+                            tp1: (adTrend < 0) ? (currentPrice * (1 - riskBuffer * 2)).toFixed(4) : (currentPrice * (1 + riskBuffer * 2)).toFixed(4),
+                            tp2: (adTrend < 0) ? (currentPrice * (1 - riskBuffer * 5)).toFixed(4) : (currentPrice * (1 + riskBuffer * 5)).toFixed(4)
                         }
                     });
                 }
