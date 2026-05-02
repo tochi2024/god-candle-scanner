@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Whale Intel Pro | Ultimate Terminal</title>
+    <title>Whale Intel Pro | Intelligence Terminal</title>
     <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
     <style>
         :root {
@@ -22,9 +22,9 @@
         #main-view { flex-grow: 1; background: #000; position: relative; }
         h1 { font-size: 1rem; font-weight: 900; color: var(--accent); margin: 0 0 15px 0; text-transform: uppercase; }
         .controls { background: var(--bg-card); padding: 15px; border-radius: 12px; border: 1px solid var(--border); margin-bottom: 15px; }
-        .row { display: flex; gap: 8px; margin-bottom: 8px; }
+        .row { display: flex; gap: 8px; margin-bottom: 10px; }
         input { background: transparent; border: 1px solid var(--border); color: var(--text-main); padding: 10px; border-radius: 8px; flex-grow: 1; font-size: 13px; }
-        button { border: none; padding: 10px; font-weight: 700; border-radius: 8px; cursor: pointer; font-size: 9px; width: 100%; text-transform: uppercase; }
+        button { border: none; padding: 10px; font-weight: 700; border-radius: 8px; cursor: pointer; font-size: 10px; width: 100%; text-transform: uppercase; }
         .btn-acc { background: var(--accent); color: #000; }
         .btn-dist { background: var(--danger); color: #fff; }
         .btn-pump { background: var(--pump); color: #fff; }
@@ -32,18 +32,17 @@
         .btn-search { background: var(--text-main); color: var(--bg-main); width: auto; }
 
         .card { background: var(--bg-card); border: 1px solid var(--border); padding: 16px; margin-bottom: 12px; border-radius: 12px; cursor: pointer; transition: 0.2s; }
-        .card:hover { border-color: var(--accent); }
         .card.active { border-color: var(--accent); background: var(--bg-sidebar); border-width: 2px; }
         .badge { font-size: 10px; font-weight: 900; padding: 4px 10px; border-radius: 6px; text-transform: uppercase; margin: 8px 0; display: inline-block; }
-        
         .metrics-row { display: flex; gap: 15px; font-size: 11px; color: var(--text-muted); border-bottom: 1px solid var(--border); padding-bottom: 8px; margin: 8px 0; }
+        .metrics-row b { color: var(--text-main); }
         .strength-bar-bg { background: var(--border); height: 4px; border-radius: 2px; overflow: hidden; margin: 6px 0; }
         .plan-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; background: rgba(120,120,120,0.06); padding: 10px; border-radius: 8px; }
         .plan-item { font-size: 11px; color: var(--text-muted); }
         .plan-item b { color: var(--text-main); display: block; font-size: 13px; }
 
-        .steady-report { background: rgba(0, 229, 255, 0.1); border: 1px solid var(--steady); padding: 10px; border-radius: 8px; margin-top: 10px; }
-        .steady-val { color: var(--steady); font-weight: 900; font-size: 15px; }
+        .steady-report { background: rgba(0, 229, 255, 0.1); border: 1px solid var(--steady); padding: 12px; border-radius: 8px; margin-top: 10px; text-align: center; }
+        .steady-val { color: var(--steady); font-weight: 900; font-size: 18px; display: block; }
 
         #progress-bar { height: 4px; background: var(--accent); width: 0%; transition: 0.3s; margin-bottom: 10px; }
         #chart-container { width: 100%; height: 100%; }
@@ -55,7 +54,7 @@
         <h1>Whale Intelligence</h1>
         <div class="controls">
             <div class="row">
-                <input type="text" id="symbolInput" placeholder="Ticker (RAVE)">
+                <input type="text" id="symbolInput" placeholder="Symbol (RAVE)">
                 <button class="btn-search" onclick="manualScan()">GO</button>
             </div>
             <div class="row">
@@ -64,11 +63,11 @@
             </div>
             <div class="row">
                 <button class="btn-pump" onclick="startFullScan('pump')">20D HIGHS</button>
-                <button class="btn-steady" onclick="startFullScan('steady')">STEADY TREND</button>
+                <button class="btn-steady" onclick="startFullScan('steady')">STEADY TREND (1H)</button>
             </div>
         </div>
         <div id="progress-bar"></div>
-        <div id="status" style="font-size: 11px; color: var(--text-muted); margin-bottom: 15px">Select a mode...</div>
+        <div id="status" style="font-size: 11px; color: var(--text-muted); margin-bottom: 15px">Awaiting mode...</div>
         <div id="results"></div>
     </div>
     <div id="main-view"><div id="chart-container"></div></div>
@@ -87,11 +86,11 @@
             
             let currentIdx = 0;
             while (totalFound < 50 && currentIdx < 1500) {
-                status.innerText = `Hunting... Found ${totalFound}/50`;
+                status.innerText = `Searching... Found ${totalFound}/50`;
                 try {
                     const response = await fetch(`/api/scan?start=${currentIdx}&end=${currentIdx + 50}&mode=${mode}`);
                     const data = await response.json();
-                    if (data.length > 0) { renderResults(data); totalFound += data.length; }
+                    if (data.length > 0) { renderResults(data, false, mode); totalFound += data.length; }
                     currentIdx += 50;
                     progress.style.width = (totalFound / 50 * 100) + "%";
                 } catch (e) { break; }
@@ -107,39 +106,29 @@
             renderResults(data, true);
         }
 
-        function renderResults(data, prepend = false) {
+        function renderResults(data, prepend = false, currentMode) {
             const resDiv = document.getElementById('results');
             data.forEach(coin => {
                 const div = document.createElement('div');
                 div.className = 'card';
-                div.onclick = () => loadChart(coin.symbol, div);
+                div.onclick = () => loadChart(coin.symbol, div, currentMode);
                 
                 let sColor = coin.strength > 75 ? '#00ff88' : (coin.strength > 40 ? '#ffaa00' : '#ff4444');
 
                 let html = `
                     <div style="display:flex; justify-content:space-between; font-weight:800; font-size:16px"><span>${coin.symbol}</span><span>$${coin.price}</span></div>
+                    <div class="metrics-row"><span>Vol: <b>${coin.volatility}</b></span><span>MF: <b>${coin.adScore}</b></span></div>
+                    <div style="font-size:11px; font-weight:800; color:var(--text-main)">STRENGTH <span>${coin.strength}%</span></div>
+                    <div class="strength-bar-bg"><div style="height:100%; width:${coin.strength}%; background:${sColor}"></div></div>
+                    <span class="badge" style="background:${coin.color}; color:#000">${coin.status}</span>
                 `;
 
                 if (coin.steadyHours) {
-                    html += `
-                        <span class="badge" style="background:${coin.color}; color:#000">${coin.status}</span>
-                        <div class="steady-report">
-                            <span class="steady-val">⏱️ DURATION: ${coin.steadyHours} HOURS</span>
-                        </div>
-                    `;
-                } else {
-                    html += `
-                        <div class="metrics-row"><span>Vol: <b>${coin.volatility}</b></span><span>MF: <b>${coin.adScore}</b></span></div>
-                        <div style="font-size:10px; font-weight:800; color:var(--text-main)">STRENGTH <span>${coin.strength}%</span></div>
-                        <div class="strength-bar-bg"><div style="height:100%; width:${coin.strength}%; background:${sColor}"></div></div>
-                        <span class="badge" style="background:${coin.color}; color:${coin.color==='#ef4444'?'#fff':'#000'}">${coin.status}</span>
-                    `;
-                    
-                    if (coin.modeData.isPump) {
-                        html += `<div style="margin-top:10px; border:1px solid var(--pump); padding:8px; border-radius:8px; color:var(--pump); font-weight:800; font-size:12px">🚀 GAIN: ${coin.modeData.increase} <br><small>Peak Day: ${coin.modeData.peakDay}</small></div>`;
-                    } else {
-                        html += `<div class="plan-grid"><div class="plan-item">Entry<b>${coin.plan.entry}</b></div><div class="plan-item" style="border-left:3px solid var(--danger); padding-left:8px">Stop<b>${coin.plan.stop}</b></div><div class="plan-item" style="border-left:3px solid var(--accent); padding-left:8px">TP1<b>${coin.plan.tp1}</b></div><div class="plan-item" style="border-left:3px solid var(--accent); padding-left:8px">TP2<b>${coin.plan.tp2}</b></div></div>`;
-                    }
+                    html += `<div class="steady-report"><span class="steady-val">⏱️ ${coin.steadyHours} HOURS</span>Since Peak/Floor</div>`;
+                } else if (coin.modeData?.isPump) {
+                    html += `<div class="extra-data" style="color:var(--pump); border-color:var(--pump)">🚀 20D HIGH REACHED <br><small>${coin.modeData.peak} Days Ago</small></div>`;
+                } else if (coin.plan.stop !== "N/A") {
+                    html += `<div class="plan-grid"><div class="plan-item">Entry<b>${coin.plan.entry}</b></div><div class="plan-item" style="border-left:3px solid var(--danger); padding-left:8px">Stop<b>${coin.plan.stop}</b></div><div class="plan-item" style="border-left:3px solid var(--accent); padding-left:8px">TP1<b>${coin.plan.tp1}</b></div><div class="plan-item" style="border-left:3px solid var(--accent); padding-left:8px">TP2<b>${coin.plan.tp2}</b></div></div>`;
                 }
 
                 div.innerHTML = html + `<div class="conclusion"><b>Verdict:</b> ${coin.explanation}</div>`;
@@ -147,10 +136,11 @@
             });
         }
 
-        function loadChart(symbol, element) {
+        function loadChart(symbol, element, mode) {
             document.querySelectorAll('.card').forEach(c => c.classList.remove('active'));
             element.classList.add('active');
-            new TradingView.widget({ "autosize": true, "symbol": "MEXC:" + symbol + "USDT.P", "interval": "D", "theme": THEME, "style": "1", "container_id": "chart-container" });
+            const interval = mode === 'steady' ? "60" : "D";
+            new TradingView.widget({ "autosize": true, "symbol": "MEXC:" + symbol + "USDT.P", "interval": interval, "theme": THEME, "style": "1", "container_id": "chart-container" });
         }
     </script>
 </body>
