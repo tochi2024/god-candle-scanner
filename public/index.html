@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Whale Intel Pro | Intelligence Terminal</title>
+    <title>Whale Intel Pro | High Liquidity Scanner</title>
     <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
     <style>
         :root {
@@ -24,14 +24,14 @@
         .controls { background: var(--bg-card); padding: 15px; border-radius: 12px; border: 1px solid var(--border); margin-bottom: 15px; }
         .row { display: flex; gap: 8px; margin-bottom: 10px; }
         input { background: transparent; border: 1px solid var(--border); color: var(--text-main); padding: 10px; border-radius: 8px; flex-grow: 1; font-size: 13px; }
-        button { border: none; padding: 10px; font-weight: 700; border-radius: 8px; cursor: pointer; font-size: 10px; width: 100%; text-transform: uppercase; }
+        button { border: none; padding: 10px; font-weight: 700; border-radius: 8px; cursor: pointer; font-size: 9px; width: 100%; text-transform: uppercase; }
         .btn-acc { background: var(--accent); color: #000; }
         .btn-dist { background: var(--danger); color: #fff; }
         .btn-pump { background: var(--pump); color: #fff; }
         .btn-steady { background: var(--steady); color: #000; }
         .btn-search { background: var(--text-main); color: var(--bg-main); width: auto; }
-
         .card { background: var(--bg-card); border: 1px solid var(--border); padding: 16px; margin-bottom: 12px; border-radius: 12px; cursor: pointer; transition: 0.2s; }
+        .card:hover { border-color: var(--accent); }
         .card.active { border-color: var(--accent); background: var(--bg-sidebar); border-width: 2px; }
         .badge { font-size: 10px; font-weight: 900; padding: 4px 10px; border-radius: 6px; text-transform: uppercase; margin: 8px 0; display: inline-block; }
         .metrics-row { display: flex; gap: 15px; font-size: 11px; color: var(--text-muted); border-bottom: 1px solid var(--border); padding-bottom: 8px; margin: 8px 0; }
@@ -40,10 +40,7 @@
         .plan-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; background: rgba(120,120,120,0.06); padding: 10px; border-radius: 8px; }
         .plan-item { font-size: 11px; color: var(--text-muted); }
         .plan-item b { color: var(--text-main); display: block; font-size: 13px; }
-
-        .steady-report { background: rgba(0, 229, 255, 0.1); border: 1px solid var(--steady); padding: 12px; border-radius: 8px; margin-top: 10px; text-align: center; }
-        .steady-val { color: var(--steady); font-weight: 900; font-size: 18px; display: block; }
-
+        .vol-info { font-size: 11px; color: var(--warning); font-weight: bold; margin-bottom: 5px; display: block; }
         #progress-bar { height: 4px; background: var(--accent); width: 0%; transition: 0.3s; margin-bottom: 10px; }
         #chart-container { width: 100%; height: 100%; }
         .conclusion { font-size: 11px; font-style: italic; color: var(--text-muted); margin-top: 10px; line-height: 1.4; }
@@ -67,7 +64,7 @@
             </div>
         </div>
         <div id="progress-bar"></div>
-        <div id="status" style="font-size: 11px; color: var(--text-muted); margin-bottom: 15px">Awaiting mode...</div>
+        <div id="status" style="font-size: 11px; color: var(--text-muted); margin-bottom: 15px">Liquidity Filter: >$600k 24h Vol</div>
         <div id="results"></div>
     </div>
     <div id="main-view"><div id="chart-container"></div></div>
@@ -86,7 +83,7 @@
             
             let currentIdx = 0;
             while (totalFound < 50 && currentIdx < 1500) {
-                status.innerText = `Searching... Found ${totalFound}/50`;
+                status.innerText = `Searching Liquidity... Found ${totalFound}/50`;
                 try {
                     const response = await fetch(`/api/scan?start=${currentIdx}&end=${currentIdx + 50}&mode=${mode}`);
                     const data = await response.json();
@@ -95,7 +92,7 @@
                     progress.style.width = (totalFound / 50 * 100) + "%";
                 } catch (e) { break; }
             }
-            status.innerText = "Scan Complete.";
+            status.innerText = "Scan Complete (600k+ Vol Filtered).";
         }
 
         async function manualScan() {
@@ -117,6 +114,7 @@
 
                 let html = `
                     <div style="display:flex; justify-content:space-between; font-weight:800; font-size:16px"><span>${coin.symbol}</span><span>$${coin.price}</span></div>
+                    <span class="vol-info">📊 24h Vol: $${coin.vol24h}</span>
                     <div class="metrics-row"><span>Vol: <b>${coin.volatility}</b></span><span>MF: <b>${coin.adScore}</b></span></div>
                     <div style="font-size:11px; font-weight:800; color:var(--text-main)">STRENGTH <span>${coin.strength}%</span></div>
                     <div class="strength-bar-bg"><div style="height:100%; width:${coin.strength}%; background:${sColor}"></div></div>
@@ -124,9 +122,9 @@
                 `;
 
                 if (coin.steadyHours) {
-                    html += `<div class="steady-report"><span class="steady-val">⏱️ ${coin.steadyHours} HOURS</span>Since Peak/Floor</div>`;
+                    html += `<div style="margin-top:10px; font-weight:900; color:var(--steady)">⏱️ ${coin.steadyHours} HOURS TRENDING</div>`;
                 } else if (coin.modeData?.isPump) {
-                    html += `<div class="extra-data" style="color:var(--pump); border-color:var(--pump)">🚀 20D HIGH REACHED <br><small>${coin.modeData.peak} Days Ago</small></div>`;
+                    html += `<div style="margin-top:10px; color:var(--pump); font-weight:800">🚀 GAIN: ${coin.modeData.increase} <br><small>${coin.modeData.peakDay} Days Ago</small></div>`;
                 } else if (coin.plan.stop !== "N/A") {
                     html += `<div class="plan-grid"><div class="plan-item">Entry<b>${coin.plan.entry}</b></div><div class="plan-item" style="border-left:3px solid var(--danger); padding-left:8px">Stop<b>${coin.plan.stop}</b></div><div class="plan-item" style="border-left:3px solid var(--accent); padding-left:8px">TP1<b>${coin.plan.tp1}</b></div><div class="plan-item" style="border-left:3px solid var(--accent); padding-left:8px">TP2<b>${coin.plan.tp2}</b></div></div>`;
                 }
