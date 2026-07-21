@@ -31,12 +31,14 @@
         .btn-steady { background: var(--steady); color: #000; }
         .btn-vsurge { background: var(--vsurge); color: #fff; }
         .btn-search { background: var(--text-main); color: var(--bg-main); width: auto; }
+
         .card { background: var(--bg-card); border: 1px solid var(--border); padding: 16px; margin-bottom: 12px; border-radius: 12px; cursor: pointer; transition: 0.2s; }
         .card.active { border-color: var(--accent); background: var(--bg-sidebar); border-width: 2px; }
         .badge { font-size: 10px; font-weight: 900; padding: 4px 10px; border-radius: 6px; text-transform: uppercase; margin: 8px 0; display: inline-block; }
         .metrics-row { display: flex; gap: 15px; font-size: 11px; color: var(--text-muted); border-bottom: 1px solid var(--border); padding-bottom: 8px; margin: 8px 0; }
+        .metrics-row b { color: var(--text-main); }
         .strength-bar-bg { background: var(--border); height: 4px; border-radius: 2px; overflow: hidden; margin: 6px 0; }
-        .extra-data { padding: 12px; border-radius: 8px; margin-top: 10px; font-size: 14px; font-weight: 900; border: 1px solid var(--border); text-align: center; }
+        .extra-data { padding: 12px; border-radius: 8px; margin-top: 10px; font-size: 14px; font-weight: 900; border: 1px solid var(--border); text-align: center; background: rgba(120,120,120,0.03); }
         .plan-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; background: rgba(120,120,120,0.06); padding: 10px; border-radius: 8px; }
         .plan-item { font-size: 11px; color: var(--text-muted); }
         .plan-item b { color: var(--text-main); display: block; font-size: 13px; }
@@ -61,7 +63,7 @@
                 <button class="btn-pump" onclick="startFullScan('pump')">20D HIGHS</button>
                 <button class="btn-steady" onclick="startFullScan('steady')">STEADY TREND</button>
             </div>
-            <button class="btn-vsurge" style="margin-top:5px" onclick="startFullScan('vsurge')">ZONE CROSSOVER (NEG ➡️ POS)</button>
+            <button class="btn-vsurge" style="margin-top:5px" onclick="startFullScan('vsurge')">ZONE CROSSOVER (-3% ➡️ +6%)</button>
         </div>
         <div id="progress-bar"></div>
         <div id="status" style="font-size: 11px; color: var(--text-muted); margin-bottom: 15px">Ready</div>
@@ -120,12 +122,13 @@
                 `;
 
                 if (coin.vSurgeData) {
-                    html += `<div class="extra-data" style="color:var(--vsurge); border-color:var(--vsurge)">NEG ZONE: ${coin.vSurgeData.neg} <br>POS ZONE: +${coin.vSurgeData.pos}</div>`;
+                    html += `<div class="extra-data" style="color:var(--vsurge); border-color:var(--vsurge)">NEG DIFF: ${coin.vSurgeData.neg} <br>POS DIFF: ${coin.vSurgeData.pos}</div>`;
                 } else if (coin.steadyHours) {
                     html += `<div style="margin-top:10px; font-weight:900; color:var(--steady); text-align:center">⏱️ ${coin.steadyHours} HOURS TRENDING</div>`;
-                } else if (coin.plan.stop !== "N/A") {
-                    html += `<div class="plan-grid"><div class="plan-item">Entry<b>${coin.plan.entry}</b></div><div class="plan-item" style="border-left:3px solid var(--danger); padding-left:8px">Stop<b>${coin.plan.stop}</b></div><div class="plan-item" style="border-left:3px solid var(--accent); padding-left:8px">TP1<b>${coin.plan.tp1}</b></div><div class="plan-item" style="border-left:3px solid var(--accent); padding-left:8px">TP2<b>${coin.plan.tp2}</b></div></div>`;
                 }
+                
+                html += `<div class="plan-grid"><div class="plan-item">Entry<b>${coin.plan.entry}</b></div><div class="plan-item" style="border-left:3px solid var(--danger); padding-left:8px">Stop<b>${coin.plan.stop}</b></div><div class="plan-item" style="border-left:3px solid var(--accent); padding-left:8px">TP1<b>${coin.plan.tp1}</b></div><div class="plan-item" style="border-left:3px solid var(--accent); padding-left:8px">TP2<b>${coin.plan.tp2}</b></div></div>`;
+                
                 div.innerHTML = html + `<div class="conclusion"><b>Verdict:</b> ${coin.explanation}</div>`;
                 if(prepend) resDiv.prepend(div); else resDiv.appendChild(div);
             });
